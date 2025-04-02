@@ -33,43 +33,6 @@ Transform your study materials into powerful learning tools with SuperchargedNot
   - Tailwind CSS
   - Clerk Authentication
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-
-### Installation
-
-1. Clone the repository
-```bash
-git clone https://github.com/yourusername/notestocards.git
-cd notestocards
-```
-
-2. Install dependencies
-```bash
-npm install
-# or
-yarn install
-```
-
-3. Set up environment variables
-Create a `.env.local` file in the root directory and add your Clerk credentials:
-```env
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_publishable_key
-CLERK_SECRET_KEY=your_secret_key
-```
-
-4. Run the development server
-```bash
-npm run dev
-# or
-yarn dev
-```
-
-5. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Usage
 
