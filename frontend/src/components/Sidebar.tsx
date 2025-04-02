@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
 import { useState } from 'react';
-
+import { UploadModal } from './Sidebar/uploadmodal';
 interface NavItem {
     label: string;
     href: string;
@@ -112,10 +112,7 @@ export default function Sidebar() {
                             </div>
                         )}
 
-                        <Button variant="ghost" className="bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors w-full justify-start">
-                            <Upload className="w-4 h-4" />
-                            Upload Notes
-                        </Button>
+                        <UploadModal />
                     </nav>
                 </div>
 

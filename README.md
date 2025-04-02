@@ -2,7 +2,7 @@
 
 Transform your study materials into powerful learning tools with SuperchargedNotes - an AI-powered platform that converts handwritten notes into interactive study materials.
 
-![SuperchargedNotes](public/note.png)
+![SuperchargedNotes]()
 
 ## Features
 
