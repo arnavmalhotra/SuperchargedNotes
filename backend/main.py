@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 import tempfile
+import json
 from google import genai
 from pathlib import Path
 from dotenv import load_dotenv
@@ -94,12 +95,10 @@ def process_file(file_path: str, original_filename: str = None):
 def generate_title(content: str) -> str:
     """Generates a concise title for the given content using the AI model."""
     try:
-        prompt = f"Generate a concise and relevant title (less than 10 words) for the following notes:\n\n{content}\n\nTitle:"
+        prompt = f"Generate an extremely concise plaintext title (5 words or less) that accurately reflects the following notes:\n\n{content}\n\nTitle:"
         response = client.models.generate_content(
             model="gemini-2.0-flash", # Or another suitable model like gemini-1.5-flash
-            contents=[prompt],
-            generation_config={"max_output_tokens": 20} # Limit title length
-        )
+            contents=[prompt])
         # Clean up the title - remove potential quotes or extra whitespace
         title = response.text.strip().strip('"').strip("'")
         return title if title else "Untitled Note"
@@ -107,104 +106,252 @@ def generate_title(content: str) -> str:
         print(f"Error generating title: {e}")
         return "Untitled Note" # Fallback title
 
-@app.post("/upload", response_model=schemas.Note) # Return the created note schema
+@app.post("/upload", response_model=list[schemas.Note]) # Return a LIST of created notes
 async def upload(
     files: list[UploadFile] = File(...),
     user_id: str = Form(...), # Get user_id from form data
+    grouping_structure: str = Form(None), # Optional grouping structure (JSON string)
     db: Session = Depends(get_db) # Inject DB session
 ):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
-        
-    results = []
+
+    # Create a mapping from original filename to UploadFile object for easy lookup
+    file_map = {file.filename: file for file in files}
+    created_notes = []
     errors = []
-    
-    for file in files:
-        temp_file = None
+
+    if grouping_structure:
         try:
-            print(f"Processing file: {file.filename}")
-            with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                temp_file = tmp.name
-                content = await file.read()
-                tmp.write(content)
-                tmp.flush()
+            structure = json.loads(grouping_structure)
+            print(f"Processing with grouping structure: {structure}")
+
+            # --- Process based on structure ---
+            for item in structure:
+                item_type = item.get('type')
+                item_id = item.get('id') # Frontend ID, useful for potential error reporting
+
+                if item_type == 'individual':
+                    filename = item.get('filename')
+                    file = file_map.get(filename)
+                    if not file:
+                        errors.append(f"File '{filename}' mentioned in structure not found in upload.")
+                        continue
+                    
+                    print(f"Processing individual file: {filename}")
+                    temp_file_path = None
+                    try:
+                        # --- Process the single file ---
+                        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                            temp_file_path = tmp.name
+                            content = await file.read()
+                            await file.seek(0) # Reset file pointer in case it's read again
+                            tmp.write(content)
+                            tmp.flush()
+                        
+                        processed_content = process_file(temp_file_path, filename)
+                        if processed_content and processed_content.startswith("Error:"):
+                            errors.append(f"Error processing {filename}: {processed_content}")
+                            continue # Skip saving this note
+                        
+                        if not processed_content or not processed_content.strip():
+                            errors.append(f"Empty content after processing {filename}.")
+                            continue # Skip saving empty note
+
+                        # --- Generate title and save note ---
+                        title = generate_title(processed_content)
+                        note_data = schemas.NoteCreate(
+                            title=title,
+                            content=processed_content,
+                            user_id=user_id
+                        )
+                        db_note = models.Note(**note_data.dict())
+                        db.add(db_note)
+                        db.commit()
+                        db.refresh(db_note)
+                        created_notes.append(db_note)
+                        print(f"Saved individual note: {title} (ID: {db_note.id})")
+
+                    except Exception as e:
+                        db.rollback()
+                        import traceback
+                        error_trace = traceback.format_exc()
+                        err_msg = f"Failed to process/save individual file {filename}: {str(e)}"
+                        print(f"{err_msg}\n{error_trace}")
+                        errors.append(err_msg)
+                    finally:
+                        if temp_file_path and os.path.exists(temp_file_path):
+                            try: os.unlink(temp_file_path)
+                            except OSError as e: print(f"Error deleting temp file {temp_file_path}: {e}")
+
+                elif item_type == 'group':
+                    group_filenames = item.get('filenames', [])
+                    print(f"Processing group with files: {group_filenames}")
+                    group_results = []
+                    temp_files_in_group = []
+
+                    try:
+                        for filename in group_filenames:
+                            file = file_map.get(filename)
+                            if not file:
+                                errors.append(f"File '{filename}' for group {item_id} not found.")
+                                continue # Skip this file within the group
+                            
+                            temp_file_path = None
+                            try:
+                                with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                                    temp_file_path = tmp.name
+                                    content = await file.read()
+                                    await file.seek(0) # Reset pointer
+                                    tmp.write(content)
+                                    tmp.flush()
+                                temp_files_in_group.append(temp_file_path) # Track for cleanup
+
+                                result = process_file(temp_file_path, filename)
+                                if result and result.startswith("Error:"):
+                                     errors.append(f"Error processing {filename} in group: {result}")
+                                     # Decide if we should skip the whole group or just this file's content
+                                     # For now, we'll just log the error and exclude its content
+                                     continue 
+                                group_results.append(result)
+                            except Exception as e:
+                                errors.append(f"Failed processing file {filename} within group: {e}")
+                            # Note: Temp file cleanup for group happens in outer finally block
+
+                        # --- Combine, generate title, save group note ---
+                        if not group_results:
+                             errors.append(f"Group {item_id} resulted in no processable content.")
+                             continue # Skip saving this group note
+                        
+                        combined_content = "\n\n".join(filter(None, group_results)) # Filter out potential None/empty results
+                        if not combined_content or not combined_content.strip():
+                            errors.append(f"Empty combined content for group {item_id}.")
+                            continue # Skip saving empty group note
+
+                        title = generate_title(combined_content)
+                        note_data = schemas.NoteCreate(
+                            title=title,
+                            content=combined_content,
+                            user_id=user_id
+                        )
+                        db_note = models.Note(**note_data.dict())
+                        db.add(db_note)
+                        db.commit()
+                        db.refresh(db_note)
+                        created_notes.append(db_note)
+                        print(f"Saved group note: {title} (ID: {db_note.id})")
+
+                    except Exception as e:
+                        db.rollback()
+                        import traceback
+                        error_trace = traceback.format_exc()
+                        err_msg = f"Failed to process/save group {item_id}: {str(e)}"
+                        print(f"{err_msg}\n{error_trace}")
+                        errors.append(err_msg)
+                    finally:
+                        # Cleanup temp files created for this group
+                        for temp_f in temp_files_in_group:
+                            if os.path.exists(temp_f):
+                                try: os.unlink(temp_f)
+                                except OSError as e: print(f"Error deleting group temp file {temp_f}: {e}")
+                else:
+                    errors.append(f"Unknown item type '{item_type}' in grouping structure.")
+        
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid grouping structure format.")
+        except Exception as e: # Catch-all for unexpected structure processing errors
+             import traceback
+             error_trace = traceback.format_exc()
+             err_msg = f"Error processing grouping structure: {str(e)}"
+             print(f"{err_msg}\n{error_trace}")
+             # Return 500 if structure processing fails catastrophically
+             raise HTTPException(status_code=500, detail=err_msg)
+
+    else:
+        # --- Original behavior: Process all files as one note ---
+        print("No grouping structure provided. Processing all files as one note.")
+        all_results = []
+        temp_files_all = []
+        try:
+            for file in files:
+                temp_file_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                        temp_file_path = tmp.name
+                        content = await file.read()
+                        # No need to seek(0) here as each file is read only once
+                        tmp.write(content)
+                        tmp.flush()
+                    temp_files_all.append(temp_file_path) # Track for cleanup
+                    
+                    result = process_file(temp_file_path, file.filename)
+                    if result and result.startswith("Error:"):
+                        errors.append(f"Error processing {file.filename}: {result}")
+                        continue # Skip this file
+                    all_results.append(result)
+                except Exception as e:
+                    err_msg = f"Error processing file {file.filename} in batch: {str(e)}"
+                    print(err_msg)
+                    errors.append(err_msg)
+                # Temp file cleanup happens in outer finally
+
+            if not all_results:
+                # If all files failed or resulted in empty content with no grouping
+                error_detail = {"errors": errors, "message": "No content could be processed from the uploaded files."}
+                print(f"Upload failed for all files (no grouping): {error_detail}")
+                # Raise 400 or 500 depending on whether errors were file processing or system issues
+                # Using 400 assuming file content issues are more likely
+                raise HTTPException(status_code=400, detail=error_detail) 
+
+            combined_result = "\n\n".join(filter(None, all_results))
+            if not combined_result or not combined_result.strip():
+                 error_detail = {"errors": errors, "message": "Processed content is empty."}
+                 print(f"Upload resulted in empty content (no grouping): {error_detail}")
+                 raise HTTPException(status_code=400, detail=error_detail)
+
+            generated_title = generate_title(combined_result[:2000])
             
-            print(f"Temporary file created at: {temp_file}")
-            # Process the file with original filename
-            result = process_file(temp_file, file.filename)
-            
-            # Check if result is an error message
-            if result and result.startswith("Error:"):
-                errors.append(f"Error processing {file.filename}: {result}")
-                print(f"Error result: {result}")
-                continue
-                
-            results.append(result)
-            
+            note_data = schemas.NoteCreate(
+                title=generated_title,
+                content=combined_result,
+                user_id=user_id
+            )
+            db_note = models.Note(**note_data.dict())
+            db.add(db_note)
+            db.commit()
+            db.refresh(db_note)
+            created_notes.append(db_note)
+            print(f"Saved single combined note: {generated_title} (ID: {db_note.id})")
+
         except Exception as e:
+            db.rollback()
             import traceback
             error_trace = traceback.format_exc()
-            error_msg = f"Error processing {file.filename}: {str(e)}"
-            errors.append(error_msg)
-            print(f"Exception in upload: {error_msg}")
-            print(error_trace)
-            
+            err_msg = f"Error saving combined note: {str(e)}"
+            print(f"{err_msg}\n{error_trace}")
+            error_detail = {"errors": errors, "database_error": err_msg}
+            raise HTTPException(status_code=500, detail=error_detail)
         finally:
-            # Only attempt to delete if the file was created
-            if temp_file and os.path.exists(temp_file):
-                try:
-                    os.unlink(temp_file)
-                except PermissionError:
-                    print(f"Could not delete temporary file: {temp_file}")
-                except OSError as e: # Catch other potential OS errors
-                    print(f"Error deleting temporary file {temp_file}: {e}")
+             # Cleanup all temp files created in this block
+            for temp_f in temp_files_all:
+                if os.path.exists(temp_f):
+                    try: os.unlink(temp_f)
+                    except OSError as e: print(f"Error deleting temp file {temp_f}: {e}")
+
+    # --- Final Response --- 
+    # Even if some errors occurred during processing individual files/groups,
+    # we return the list of notes that *were* successfully created.
+    # The frontend toast can indicate partial success if desired by checking the length vs expected.
+    if not created_notes and errors:
+         # If absolutely no notes were created and errors exist, raise 500
+         # The specific errors might have been file-related (4xx) or server-related (5xx)
+         # but the overall outcome is a server failure to produce any requested note.
+         raise HTTPException(status_code=500, detail={"errors": errors, "message": "Failed to create any notes from the upload."}) 
     
-    if not results and errors:
-        # If all files failed, return a 500 with error details
-        error_detail = {"errors": errors}
-        print(f"Upload failed for all files: {error_detail}")
-        raise HTTPException(status_code=500, detail=error_detail)
-    
-    # Join all results with a newline
-    combined_result = "\n\n".join(results)
-
-    if not combined_result.strip():
-        error_detail = {"errors": errors, "message": "Processed content is empty."}
-        print(f"Upload resulted in empty content: {error_detail}")
-        raise HTTPException(status_code=400, detail=error_detail)
-
-    # Generate title for the combined content
-    print("Generating title...")
-    generated_title = generate_title(combined_result[:2000]) # Use first 2000 chars for title generation context
-    print(f"Generated title: {generated_title}")
-
-    # Save the combined result and generated title as a new note
-    try:
-        note_data = schemas.NoteCreate(
-            title=generated_title,
-            content=combined_result,
-            user_id=user_id
-        )
-        db_note = models.Note(**note_data.dict())
-        db.add(db_note)
-        db.commit()
-        db.refresh(db_note)
-        print(f"Note saved successfully with ID: {db_note.id}")
-        # Return the newly created note
-        # Also include any non-critical errors encountered during file processing
-        # Note: The response_model ensures only Note fields are returned,
-        # but we might want a custom response model later if we strictly need to include errors.
-        # For now, returning the Note object upon success.
-        return db_note
-    except Exception as e:
-        db.rollback()
-        import traceback
-        error_trace = traceback.format_exc()
-        print(f"Error saving note: {str(e)}")
-        print(error_trace)
-        # Include previous file processing errors if any
-        error_detail = {"errors": errors, "database_error": str(e)}
-        raise HTTPException(status_code=500, detail=error_detail)
+    # Return the list of successfully created notes
+    # The response_model ensures only Note fields are returned.
+    print(f"Upload complete. Created notes: {len(created_notes)}. Errors encountered: {len(errors)}.")
+    return created_notes
 
 @app.get("/notes", response_model=list[schemas.Note])
 async def get_notes(user_id: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):

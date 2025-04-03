@@ -1,9 +1,8 @@
 
+categories
 
 
-tagging.
-
-when you upload multiple files, allow the user to group them, files that are grouped together will have their output to the same markdown file. (still send the files one by one to gemini but append the output)
+show original document as well somewhere (maybe a button in the notes viewer?)
 
 
 figure out how to implement diagrams in the files etc.

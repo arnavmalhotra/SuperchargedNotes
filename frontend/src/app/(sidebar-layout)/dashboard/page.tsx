@@ -64,8 +64,8 @@ export default function DashboardPage() {
     return (
         <div className="p-8">
             <div className="max-w-6xl mx-auto">
-                <h1 className="text-3xl font-bold text-gray-900">Your Notes</h1>
-                <p className="mt-2 text-gray-600 mb-6">Review and manage your saved notes</p>
+                <h1 className="text-3xl font-bold text-gray-900">Your Documents</h1>
+                <p className="mt-2 text-gray-600 mb-6">Review and manage your saved documents</p>
                 
                 {loading ? (
                     <div className="flex justify-center my-12">
@@ -154,7 +154,7 @@ export default function DashboardPage() {
                                     
                                     <CardFooter className="flex justify-between items-center py-1 px-4 mt-auto">
                                         <div className="text-blue-500 hover:text-blue-700 transition-colors text-[10px] flex items-center">
-                                            View full notes
+                                            View full document
                                             <ExternalLink className="ml-1 h-2 w-2" />
                                         </div>
                                     </CardFooter>
