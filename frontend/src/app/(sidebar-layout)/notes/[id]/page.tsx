@@ -10,16 +10,61 @@ import { Trash, Save, ArrowLeft, Edit, X } from 'lucide-react';
 import { useNotes } from '@/contexts/NotesContext';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import './markdown-styles.css';
 
-// Add a separate MarkdownView component for cleaner re-rendering
-const MarkdownView = ({ content, keyValue }: { content: string, keyValue: number }) => {
+// Define a separate component for view mode to ensure clean rendering
+const ViewMode = ({ note }: { note: Note }) => {
   return (
-    <ReactMarkdown 
-      key={keyValue}
-      remarkPlugins={[remarkGfm]}
-    >
-      {content}
-    </ReactMarkdown>
+    <>
+      <h1 className="text-3xl font-bold text-gray-900 mb-2 p-2">
+        {note.title}
+      </h1>
+      
+      <div className="text-sm text-gray-500 mb-4">
+        {note.updated_at 
+          ? `Last updated: ${new Date(note.updated_at).toLocaleString()}`
+          : `Created: ${new Date(note.created_at).toLocaleString()}`
+        }
+      </div>
+      
+      <hr className="my-4 border-gray-200" />
+      
+      <div className="markdown-body prose max-w-none mt-4 p-2">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+          components={{
+            h1: ({children}) => <h1 className="text-2xl font-bold mt-6 mb-4 pb-1 border-b">{children}</h1>,
+            h2: ({children}) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
+            h3: ({children}) => <h3 className="text-lg font-bold mt-4 mb-2">{children}</h3>,
+            p: ({children}) => <p className="mb-4 leading-relaxed">{children}</p>,
+            ul: ({children}) => <ul className="list-disc pl-6 mb-4">{children}</ul>,
+            ol: ({children}) => <ol className="list-decimal pl-6 mb-4">{children}</ol>,
+            li: ({children}) => <li className="mb-1">{children}</li>,
+            blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 pl-4 py-1 mb-4 italic bg-gray-50 rounded-sm">{children}</blockquote>,
+            code: ({node, inline, className, children, ...props}: any) => {
+              return inline 
+                ? <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>
+                : <pre className="bg-gray-800 text-white p-4 rounded-md overflow-x-auto mb-4">
+                    <code className="font-mono text-sm">{children}</code>
+                  </pre>
+            },
+            a: ({href, children}) => <a href={href} className="text-blue-600 hover:underline">{children}</a>,
+            table: ({children}) => <div className="overflow-x-auto mb-4"><table className="w-full border-collapse border border-gray-300">{children}</table></div>,
+            thead: ({children}) => <thead className="bg-gray-100">{children}</thead>,
+            th: ({children}) => <th className="border border-gray-300 px-4 py-2 text-left">{children}</th>,
+            td: ({children}) => <td className="border border-gray-300 px-4 py-2">{children}</td>,
+            img: ({src, alt}) => <img src={src} alt={alt} className="max-w-full rounded-md my-4" />,
+            hr: () => <hr className="my-6 border-gray-300" />,
+          }}
+        >
+          {note.content}
+        </ReactMarkdown>
+      </div>
+    </>
   );
 };
 
@@ -72,36 +117,56 @@ const reducer = (state: State, action: Action): State => {
   }
 };
 
-// Define a separate component for view mode to ensure clean rendering
-const ViewMode = ({ note }: { note: Note }) => {
-  return (
-    <>
-      <h1 className="text-3xl font-bold text-gray-900 mb-2 p-2">
-        {note.title}
-      </h1>
-      
-      <div className="text-sm text-gray-500 mb-4">
-        {note.updated_at 
-          ? `Last updated: ${new Date(note.updated_at).toLocaleString()}`
-          : `Created: ${new Date(note.created_at).toLocaleString()}`
-        }
-      </div>
-      
-      <hr className="my-4 border-gray-200" />
-      
-      <div className="prose max-w-none mt-4 p-2">
-        {/* Use dangerouslySetInnerHTML first to convert markdown */}
-        <div 
-          style={{ display: 'none' }}
-          dangerouslySetInnerHTML={{ __html: note.content.replace(/\n/g, '<br/>') }} 
-        />
-        {/* Then render with ReactMarkdown */}
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-          {note.content}
-        </ReactMarkdown>
-      </div>
-    </>
-  );
+// Add a utility function for markdown shortcuts
+const applyMarkdownShortcuts = (event: React.KeyboardEvent<HTMLDivElement>, ref: React.RefObject<HTMLDivElement | null>) => {
+  if (!ref.current) return;
+  
+  // Get selection
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  
+  const range = selection.getRangeAt(0);
+  const selectedText = range.toString();
+  
+  // Handle shortcuts
+  if (event.key === 'b' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    document.execCommand('insertText', false, `**${selectedText}**`);
+    return true;
+  }
+  
+  if (event.key === 'i' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    document.execCommand('insertText', false, `*${selectedText}*`);
+    return true;
+  }
+  
+  if (event.key === '`' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    document.execCommand('insertText', false, '`' + selectedText + '`');
+    return true;
+  }
+  
+  if (event.key === 'k' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    document.execCommand('insertText', false, `[${selectedText}](url)`);
+    return true;
+  }
+  
+  // LaTeX shortcuts
+  if (event.key === 'm' && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    document.execCommand('insertText', false, `$${selectedText}$`);
+    return true;
+  }
+
+  if (event.key === 'M' && (event.ctrlKey || event.metaKey) && event.shiftKey) {
+    event.preventDefault();
+    document.execCommand('insertText', false, `$$\n${selectedText}\n$$`);
+    return true;
+  }
+  
+  return false;
 };
 
 export default function NotePage() {
@@ -337,10 +402,16 @@ export default function NotePage() {
                 ref={contentRef}
                 contentEditable={true}
                 onInput={handleContentChange}
-                className="prose max-w-none mt-4 outline-none min-h-[300px] p-2 focus:bg-gray-50 whitespace-pre-wrap"
+                onKeyDown={(e) => applyMarkdownShortcuts(e, contentRef)}
+                className="markdown-editor prose max-w-none mt-4 outline-none min-h-[300px] p-2 focus:bg-gray-50 whitespace-pre-wrap font-mono text-gray-800"
                 spellCheck={true}
                 suppressContentEditableWarning={true}
               />
+              
+              <div className="text-xs text-gray-500 mt-2 p-2">
+                <strong>Markdown shortcuts:</strong> Ctrl+B (bold), Ctrl+I (italic), Ctrl+` (code), Ctrl+K (link)<br/>
+                <strong>LaTeX shortcuts:</strong> Ctrl+M (inline math), Ctrl+Shift+M (block math)
+              </div>
             </>
           ) : (
             // Use the separate view mode component with a key for forced re-renders

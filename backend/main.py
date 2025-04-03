@@ -52,7 +52,19 @@ def process_file(file_path: str, original_filename: str = None):
             myfile = client.files.upload(file=temp_path_with_ext)
             print(f"File uploaded successfully: {myfile}")
 
-            prompt = "Convert this to well formatted markdown notes. Make sure to include all the important details and equations."
+            prompt = """Convert this to well formatted markdown notes with the following requirements:
+1. Create clear headings and subheadings using proper markdown syntax (# for main headings, ## for subheadings)
+2. Format all mathematical equations using LaTeX syntax, including:
+   - Inline equations with $...$ notation
+   - Block equations with $$...$$ notation
+   - Properly formatted fractions, integrals, summations, and special symbols
+3. Include all important details, definitions, theorems, and examples
+4. Use bullet points and numbered lists where appropriate
+5. Preserve any tables using markdown table format
+6. Add bold and italic formatting for emphasis
+7. Keep all original diagrams and figures with proper captions
+8. Include proper code blocks with syntax highlighting if applicable
+"""
             
             # Process the text with Gemini
             print(f"Sending request to Gemini model")

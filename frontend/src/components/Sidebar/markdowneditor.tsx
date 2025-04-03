@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import MDEditor from '@uiw/react-md-editor'
 import {
   Dialog,
@@ -12,6 +12,12 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import axios from 'axios'
 import { useNotes } from '@/contexts/NotesContext'
+import rehypeSanitize from "rehype-sanitize";
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
+import '@/styles/markdown-editor-custom.css'
 
 interface MarkdownEditorProps {
   isOpen: boolean
@@ -28,6 +34,19 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initia
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const { addNote, refreshNotes } = useNotes()
+
+  // Force light mode
+  useEffect(() => {
+    if (isOpen) {
+      // Force color mode to light across the app while editor is open
+      document.documentElement.setAttribute('data-color-mode', 'light');
+      
+      // Cleanup when component unmounts
+      return () => {
+        document.documentElement.removeAttribute('data-color-mode');
+      };
+    }
+  }, [isOpen]);
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -91,8 +110,27 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initia
     }
   }
 
+  // Custom styles for the markdown editor
+  const editorStyles = {
+    backgroundColor: 'white',
+    color: 'black',
+    caretColor: 'black'
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
+      {/* Inject direct styling to ensure editor text is black */}
+      <style>{`
+        .w-md-editor-text-input, 
+        .w-md-editor-text-pre > code,
+        .w-md-editor-text,
+        textarea.w-md-editor-text-input {
+          background-color: white !important;
+          color: black !important;
+          caret-color: black !important;
+          -webkit-text-fill-color: black !important;
+        }
+      `}</style>
       <DialogContent className="sm:max-w-[800px] h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>{noteId ? 'Edit Note' : 'Edit Your Notes'}</DialogTitle>
@@ -119,13 +157,37 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initia
         )}
 
         <div className="flex-grow overflow-y-auto">
-          <MDEditor
-            value={content}
-            onChange={(value) => setContent(value || '')}
-            preview="live"
-            height="100%"
-          />
+          <div data-color-mode="light" className="wmde-markdown-var" style={{ backgroundColor: 'white' }}>
+            <MDEditor
+              value={content}
+              onChange={(value) => setContent(value || '')}
+              preview="live"
+              height="100%"
+              previewOptions={{
+                remarkPlugins: [remarkGfm, remarkMath],
+                rehypePlugins: [rehypeSanitize, rehypeKatex],
+                className: "wmde-markdown-custom",
+              }}
+              className="markdown-editor-container"
+              textareaProps={{
+                placeholder: "Write your notes here... Use Markdown for formatting and $...$ for LaTeX math.",
+                style: {
+                  backgroundColor: 'white',
+                  color: 'black',
+                  caretColor: 'black',
+                  fontFamily: 'inherit'
+                }
+              }}
+              hideToolbar={true}
+              style={{
+                whiteSpace: 'pre-wrap',
+                backgroundColor: 'white',
+                color: 'black'
+              }}
+            />
+          </div>
         </div>
+
 
         <DialogFooter className="mt-4">
           <Button variant="outline" onClick={onClose}>
@@ -141,4 +203,4 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initia
       </DialogContent>
     </Dialog>
   )
-} 
+}

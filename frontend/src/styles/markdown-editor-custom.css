@@ -1,0 +1,113 @@
+/* Custom styles for markdown editor */
+
+/* Reset variables to light mode */
+:root {
+  --md-color: black !important;
+  --md-bg-color: white !important;
+}
+
+/* Force light mode */
+[data-color-mode="light"] {
+  --color-canvas-default: white !important;
+  --color-fg-default: black !important;
+}
+
+/* Invert any dark mode settings */
+[data-color-mode*="dark"] .w-md-editor-text-input,
+[data-color-mode*="dark"] .w-md-editor-text-pre > code,
+[data-color-mode*="dark"] .w-md-editor-text,
+[data-color-mode*="dark"] textarea.w-md-editor-text-input {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* Target both preview and editor with white background and black text */
+.w-md-editor {
+  background-color: white !important;
+  color: black !important;
+}
+
+/* Markdown preview panel */
+.w-md-editor-preview {
+  background-color: white !important;
+  color: black !important;
+}
+
+/* Markdown editor textarea - MORE SPECIFIC SELECTORS */
+.w-md-editor-text-input, 
+.w-md-editor-text-pre > code,
+.w-md-editor-text,
+textarea.w-md-editor-text-input {
+  background-color: white !important;
+  color: black !important;
+  caret-color: black !important;
+}
+
+/* Target the actual textarea directly */
+div[data-color-mode="light"] textarea,
+div[data-color-mode] textarea,
+textarea.w-md-editor-text-input {
+  color: black !important;
+}
+
+/* More specific targeting for editor text */
+.w-md-editor-area textarea,
+.w-md-editor-area .w-md-editor-text-input {
+  color: black !important;
+  -webkit-text-fill-color: black !important;
+}
+
+/* Override any potential dark mode */
+.w-md-editor-text-pre,
+.w-md-editor-text-pre code {
+  color: black !important;
+}
+
+/* Preview content */
+.wmde-markdown,
+.wmde-markdown-custom {
+  background-color: white !important;
+  color: black !important;
+}
+
+/* Ensure all content in preview is black */
+.wmde-markdown-color.wmde-markdown-custom h1,
+.wmde-markdown-color.wmde-markdown-custom h2,
+.wmde-markdown-color.wmde-markdown-custom h3,
+.wmde-markdown-color.wmde-markdown-custom h4,
+.wmde-markdown-color.wmde-markdown-custom h5,
+.wmde-markdown-color.wmde-markdown-custom h6,
+.wmde-markdown-color.wmde-markdown-custom p,
+.wmde-markdown-color.wmde-markdown-custom ul,
+.wmde-markdown-color.wmde-markdown-custom ol,
+.wmde-markdown-color.wmde-markdown-custom li,
+.wmde-markdown-color.wmde-markdown-custom blockquote,
+.wmde-markdown-color.wmde-markdown-custom table,
+.wmde-markdown-color.wmde-markdown-custom a {
+  color: black !important;
+}
+
+/* Style for links in preview */
+.wmde-markdown-color.wmde-markdown-custom a {
+  color: #0366d6 !important;
+}
+
+/* Apply to all child elements */
+.wmde-markdown * {
+  color: black !important;
+}
+
+/* Ensure code blocks maintain styling but with appropriate background */
+.wmde-markdown code {
+  background-color: #f0f0f0 !important;
+  color: #333 !important;
+}
+
+/* Hide markdown toolbar */
+.w-md-editor-toolbar {
+  display: none !important;
+}
+
+/* Container background */
+.markdown-editor-container {
+  background-color: white !important;
+} 
