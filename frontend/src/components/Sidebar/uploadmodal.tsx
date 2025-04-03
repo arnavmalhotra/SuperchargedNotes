@@ -12,9 +12,9 @@ import { Upload, FileText, Image, File, X } from "lucide-react"
 import { useCallback, useState } from "react"
 import { useDropzone } from "react-dropzone"
 import axios from "axios"
-import { MarkdownEditor } from "./markdowneditor"
 import { useAuth } from "@clerk/nextjs"
 import { useNotes } from "@/contexts/NotesContext"
+import { toast } from "sonner"
 
 const acceptedFileTypes = {
   'application/pdf': ['.pdf'],
@@ -29,22 +29,9 @@ const acceptedFileTypes = {
   'text/csv': ['.csv']
 }
 
-interface Note {
-  id: number;
-  title: string;
-  content: string;
-  user_id: string;
-  created_at: string;
-  updated_at: string | null;
-}
-
 export function UploadModal() {
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
-  const [showEditor, setShowEditor] = useState(false)
-  const [generatedContent, setGeneratedContent] = useState('')
-  const [noteTitle, setNoteTitle] = useState('')
-  const [noteId, setNoteId] = useState<number | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const { userId } = useAuth()
   const { refreshNotes } = useNotes()
@@ -68,46 +55,40 @@ export function UploadModal() {
       formData.append('files', file)
     })
 
+    if (userId) {
+      formData.append('user_id', userId)
+    } else {
+      console.error("User ID is missing. Cannot upload.")
+      toast.error("Authentication error. Please log in again.")
+      setUploading(false)
+      return
+    }
+
     try {
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       })
-      setGeneratedContent(response.data.result)
-      setNoteTitle('')
-      setNoteId(null)
-      setShowEditor(true)
       setFiles([])
+      setIsDialogOpen(false)
+      refreshNotes()
+      toast.success("Note created successfully!", { description: `Note titled '${response.data.title}' was saved.` })
+
     } catch (error) {
       console.error('Upload failed:', error)
-      alert('Failed to process your file. Please try again.')
+      let errorMessage = "Failed to upload and process your files. Please try again.";
+      if (axios.isAxiosError(error) && error.response?.data) {
+          if (error.response.data.detail?.errors) {
+              errorMessage = `Upload failed: ${error.response.data.detail.errors.join(", ")}`;
+          } else if (typeof error.response.data.detail === 'string') {
+              errorMessage = `Upload failed: ${error.response.data.detail}`;
+          }
+      }
+      toast.error("Upload Failed", { description: errorMessage })
     } finally {
       setUploading(false)
     }
-  }
-
-  const openNote = async (noteId: number) => {
-    try {
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/notes/${noteId}?user_id=${userId}`
-      )
-      const note: Note = response.data
-      setGeneratedContent(note.content)
-      setNoteTitle(note.title)
-      setNoteId(note.id)
-      setShowEditor(true)
-      setIsDialogOpen(false)
-    } catch (error) {
-      console.error('Failed to fetch note:', error)
-      alert('Failed to open note. Please try again.')
-    }
-  }
-
-  const handleEditorClose = () => {
-    setShowEditor(false)
-    setIsDialogOpen(false)
-    refreshNotes();
   }
 
   const removeFile = (indexToRemove: number) => {
@@ -198,17 +179,6 @@ export function UploadModal() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {showEditor && (
-        <MarkdownEditor
-          isOpen={showEditor}
-          onClose={handleEditorClose}
-          initialContent={generatedContent}
-          userId={userId || ''}
-          initialTitle={noteTitle}
-          noteId={noteId}
-        />
-      )}
     </>
   )
 }

@@ -7,6 +7,8 @@ import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
 import { useState } from 'react';
 import { UploadModal } from './Sidebar/uploadmodal';
+import { useNotes } from '@/contexts/NotesContext';
+
 interface NavItem {
     label: string;
     href: string;
@@ -14,17 +16,13 @@ interface NavItem {
 }
 
 interface Note {
-    id: string;
+    id: number;
     title: string;
-    href: string;
+    content: string;
+    user_id: string;
+    created_at: string;
+    updated_at: string | null;
 }
-
-const dummyNotes: Note[] = [
-    { id: '1', title: 'Math Notes', href: '/dashboard/notes/math' },
-    { id: '2', title: 'Physics Notes', href: '/dashboard/notes/physics' },
-    { id: '3', title: 'Chemistry Notes', href: '/dashboard/notes/chemistry' },
-    { id: '4', title: 'Biology Notes', href: '/dashboard/notes/biology' },
-];
 
 const navItems: NavItem[] = [
     {
@@ -38,6 +36,7 @@ export default function Sidebar() {
     const pathname = usePathname();
     const [isNotesOpen, setIsNotesOpen] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const { notes, loading } = useNotes();
 
     return (
         <>
@@ -109,19 +108,25 @@ export default function Sidebar() {
                         
                         {isNotesOpen && (
                             <div className="ml-6 space-y-1">
-                                {dummyNotes.map((note) => (
-                                    <Link
-                                        key={note.id}
-                                        href={note.href}
-                                        className={`flex items-center gap-x-3 px-3 py-2 rounded-lg text-sm transition-colors
-                                            ${pathname === note.href
-                                                ? 'bg-blue-50 text-blue-500'
-                                                : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
-                                            }`}
-                                    >
-                                        {note.title}
-                                    </Link>
-                                ))}
+                                {loading ? (
+                                    <div className="px-3 py-2 text-sm text-gray-500">Loading notes...</div>
+                                ) : notes.length === 0 ? (
+                                    <div className="px-3 py-2 text-sm text-gray-500">No notes yet</div>
+                                ) : (
+                                    notes.map((note) => (
+                                        <Link
+                                            key={note.id}
+                                            href={`/notes/${note.id}`}
+                                            className={`flex items-center gap-x-3 px-3 py-2 rounded-lg text-sm transition-colors
+                                                ${pathname === `/notes/${note.id}`
+                                                    ? 'bg-blue-50 text-blue-500'
+                                                    : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
+                                                }`}
+                                        >
+                                            {note.title}
+                                        </Link>
+                                    ))
+                                )}
                             </div>
                         )}
 

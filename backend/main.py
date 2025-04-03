@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
@@ -82,6 +82,8 @@ def process_file(file_path: str, original_filename: str = None):
                     os.unlink(temp_path_with_ext)
                 except PermissionError:
                     print(f"Could not delete temporary file: {temp_path_with_ext}")
+                except OSError as e: # Catch other potential OS errors like file in use
+                    print(f"Error deleting temporary file {temp_path_with_ext}: {e}")
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
@@ -89,8 +91,28 @@ def process_file(file_path: str, original_filename: str = None):
         print(error_trace)
         return f"Error: {str(e)}"
 
-@app.post("/upload")
-async def upload(files: list[UploadFile] = File(...)):
+def generate_title(content: str) -> str:
+    """Generates a concise title for the given content using the AI model."""
+    try:
+        prompt = f"Generate a concise and relevant title (less than 10 words) for the following notes:\n\n{content}\n\nTitle:"
+        response = client.models.generate_content(
+            model="gemini-2.0-flash", # Or another suitable model like gemini-1.5-flash
+            contents=[prompt],
+            generation_config={"max_output_tokens": 20} # Limit title length
+        )
+        # Clean up the title - remove potential quotes or extra whitespace
+        title = response.text.strip().strip('"').strip("'")
+        return title if title else "Untitled Note"
+    except Exception as e:
+        print(f"Error generating title: {e}")
+        return "Untitled Note" # Fallback title
+
+@app.post("/upload", response_model=schemas.Note) # Return the created note schema
+async def upload(
+    files: list[UploadFile] = File(...),
+    user_id: str = Form(...), # Get user_id from form data
+    db: Session = Depends(get_db) # Inject DB session
+):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
         
@@ -134,35 +156,59 @@ async def upload(files: list[UploadFile] = File(...)):
                     os.unlink(temp_file)
                 except PermissionError:
                     print(f"Could not delete temporary file: {temp_file}")
+                except OSError as e: # Catch other potential OS errors
+                    print(f"Error deleting temporary file {temp_file}: {e}")
     
     if not results and errors:
         # If all files failed, return a 500 with error details
-        raise HTTPException(status_code=500, detail={"errors": errors})
+        error_detail = {"errors": errors}
+        print(f"Upload failed for all files: {error_detail}")
+        raise HTTPException(status_code=500, detail=error_detail)
     
     # Join all results with a newline
     combined_result = "\n\n".join(results)
-    
-    # Return both results and any errors
-    return {
-        "result": combined_result,
-        "errors": errors if errors else None
-    }
 
-@app.post("/save", response_model=schemas.Note)
-async def save_note(note: schemas.NoteCreate, db: Session = Depends(get_db)):
+    if not combined_result.strip():
+        error_detail = {"errors": errors, "message": "Processed content is empty."}
+        print(f"Upload resulted in empty content: {error_detail}")
+        raise HTTPException(status_code=400, detail=error_detail)
+
+    # Generate title for the combined content
+    print("Generating title...")
+    generated_title = generate_title(combined_result[:2000]) # Use first 2000 chars for title generation context
+    print(f"Generated title: {generated_title}")
+
+    # Save the combined result and generated title as a new note
     try:
-        db_note = models.Note(**note.dict())
+        note_data = schemas.NoteCreate(
+            title=generated_title,
+            content=combined_result,
+            user_id=user_id
+        )
+        db_note = models.Note(**note_data.dict())
         db.add(db_note)
         db.commit()
         db.refresh(db_note)
+        print(f"Note saved successfully with ID: {db_note.id}")
+        # Return the newly created note
+        # Also include any non-critical errors encountered during file processing
+        # Note: The response_model ensures only Note fields are returned,
+        # but we might want a custom response model later if we strictly need to include errors.
+        # For now, returning the Note object upon success.
         return db_note
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error saving note: {str(e)}")
+        print(error_trace)
+        # Include previous file processing errors if any
+        error_detail = {"errors": errors, "database_error": str(e)}
+        raise HTTPException(status_code=500, detail=error_detail)
 
 @app.get("/notes", response_model=list[schemas.Note])
 async def get_notes(user_id: str, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    notes = db.query(models.Note).filter(models.Note.user_id == user_id).offset(skip).limit(limit).all()
+    notes = db.query(models.Note).filter(models.Note.user_id == user_id).order_by(models.Note.created_at.desc()).offset(skip).limit(limit).all() # Order by creation time
     return notes
 
 @app.get("/notes/{note_id}", response_model=schemas.Note)
