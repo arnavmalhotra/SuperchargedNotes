@@ -5,6 +5,7 @@ from typing import Optional
 class NoteBase(BaseModel):
     title: str
     content: str
+    user_id: str
 
 class NoteCreate(NoteBase):
     pass

@@ -13,6 +13,8 @@ import { useCallback, useState } from "react"
 import { useDropzone } from "react-dropzone"
 import axios from "axios"
 import { MarkdownEditor } from "./markdowneditor"
+import { useAuth } from "@clerk/nextjs"
+import { useNotes } from "@/contexts/NotesContext"
 
 const acceptedFileTypes = {
   'application/pdf': ['.pdf'],
@@ -33,6 +35,8 @@ export function UploadModal() {
   const [showEditor, setShowEditor] = useState(false)
   const [generatedContent, setGeneratedContent] = useState('')
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const { userId } = useAuth()
+  const { refreshNotes } = useNotes()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     setFiles(acceptedFiles)
@@ -73,6 +77,7 @@ export function UploadModal() {
   const handleEditorClose = () => {
     setShowEditor(false)
     setIsDialogOpen(false)
+    refreshNotes();
   }
 
   return (
@@ -149,6 +154,7 @@ export function UploadModal() {
           isOpen={showEditor}
           onClose={handleEditorClose}
           initialContent={generatedContent}
+          userId={userId || ''}
         />
       )}
     </>

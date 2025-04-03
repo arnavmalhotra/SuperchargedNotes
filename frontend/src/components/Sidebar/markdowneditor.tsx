@@ -11,17 +11,21 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import axios from 'axios'
+import { useNotes } from '@/contexts/NotesContext'
 
 interface MarkdownEditorProps {
   isOpen: boolean
   onClose: () => void
   initialContent: string
+  userId: string
 }
 
-export function MarkdownEditor({ isOpen, onClose, initialContent }: MarkdownEditorProps) {
+export function MarkdownEditor({ isOpen, onClose, initialContent, userId }: MarkdownEditorProps) {
   const [content, setContent] = useState(initialContent)
   const [title, setTitle] = useState('')
   const [saving, setSaving] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const { addNote } = useNotes()
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -30,15 +34,50 @@ export function MarkdownEditor({ isOpen, onClose, initialContent }: MarkdownEdit
     }
 
     setSaving(true)
+    setErrorMessage(null)
+    
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/save`, {
+      const payload = {
         title,
-        content
-      })
+        content,
+        user_id: userId
+      }
+      console.log('Saving note with payload:', payload)
+      console.log('API URL:', process.env.NEXT_PUBLIC_API_URL)
+      
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/save`, payload)
+      console.log('Save response:', response.data)
+      
+      // Add the note to the context so it shows up immediately
+      addNote(response.data)
+      
       onClose()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save:', error)
-      alert('Failed to save your notes. Please try again.')
+      let message = 'Failed to save your notes. Please try again.'
+      
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        console.error('Error response data:', error.response.data)
+        console.error('Error response status:', error.response.status)
+        console.error('Error response headers:', error.response.headers)
+        
+        if (error.response.data && error.response.data.detail) {
+          message = `Error: ${error.response.data.detail}`
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Error request:', error.request)
+        message = 'No response received from server. Please check your connection.'
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        console.error('Error message:', error.message)
+        message = `Error: ${error.message}`
+      }
+      
+      setErrorMessage(message)
+      alert(message)
     } finally {
       setSaving(false)
     }
@@ -63,11 +102,17 @@ export function MarkdownEditor({ isOpen, onClose, initialContent }: MarkdownEdit
           />
         </div>
 
+        {errorMessage && (
+          <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm">
+            {errorMessage}
+          </div>
+        )}
+
         <div className="flex-grow overflow-y-auto">
           <MDEditor
             value={content}
             onChange={(value) => setContent(value || '')}
-            preview="edit"
+            preview="live"
             height="100%"
           />
         </div>

@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { ClerkProvider } from "@clerk/nextjs";
+import { NotesProvider } from "@/contexts/NotesContext";
 
 
 const geistSans = Geist({
@@ -34,7 +35,9 @@ export default function RootLayout({
       >
         <Navbar />
         <main className="min-h-screen">
-          {children}
+          <NotesProvider>
+            {children}
+          </NotesProvider>
         </main>
         <Footer />
       </body>
