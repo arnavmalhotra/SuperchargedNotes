@@ -14,6 +14,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 import './markdown-styles.css';
+import Link from 'next/link';
 
 // Define a separate component for view mode to ensure clean rendering
 const ViewMode = ({ note }: { note: Note }) => {
@@ -30,35 +31,35 @@ const ViewMode = ({ note }: { note: Note }) => {
         }
       </div>
       
-      <hr className="my-4 border-gray-200" />
+      <hr className="my-4 border-blue-100" />
       
       <div className="markdown-body prose max-w-none mt-4 p-2">
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeKatex]}
           components={{
-            h1: ({children}) => <h1 className="text-2xl font-bold mt-6 mb-4 pb-1 border-b">{children}</h1>,
-            h2: ({children}) => <h2 className="text-xl font-bold mt-5 mb-3">{children}</h2>,
-            h3: ({children}) => <h3 className="text-lg font-bold mt-4 mb-2">{children}</h3>,
+            h1: ({children}) => <h1 className="text-2xl font-bold mt-6 mb-4 pb-1 border-b border-blue-100">{children}</h1>,
+            h2: ({children}) => <h2 className="text-xl font-bold mt-5 mb-3 text-blue-900">{children}</h2>,
+            h3: ({children}) => <h3 className="text-lg font-bold mt-4 mb-2 text-blue-800">{children}</h3>,
             p: ({children}) => <p className="mb-4 leading-relaxed">{children}</p>,
             ul: ({children}) => <ul className="list-disc pl-6 mb-4">{children}</ul>,
             ol: ({children}) => <ol className="list-decimal pl-6 mb-4">{children}</ol>,
             li: ({children}) => <li className="mb-1">{children}</li>,
-            blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 pl-4 py-1 mb-4 italic bg-gray-50 rounded-sm">{children}</blockquote>,
+            blockquote: ({children}) => <blockquote className="border-l-4 border-blue-300 pl-4 py-1 mb-4 italic bg-blue-50 rounded-sm">{children}</blockquote>,
             code: ({node, inline, className, children, ...props}: any) => {
               return inline 
-                ? <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>
-                : <pre className="bg-gray-800 text-white p-4 rounded-md overflow-x-auto mb-4">
+                ? <code className="bg-blue-50 px-1 py-0.5 rounded text-sm font-mono">{children}</code>
+                : <pre className="bg-blue-900 text-white p-4 rounded-md overflow-x-auto mb-4">
                     <code className="font-mono text-sm">{children}</code>
                   </pre>
             },
             a: ({href, children}) => <a href={href} className="text-blue-600 hover:underline">{children}</a>,
-            table: ({children}) => <div className="overflow-x-auto mb-4"><table className="w-full border-collapse border border-gray-300">{children}</table></div>,
-            thead: ({children}) => <thead className="bg-gray-100">{children}</thead>,
-            th: ({children}) => <th className="border border-gray-300 px-4 py-2 text-left">{children}</th>,
-            td: ({children}) => <td className="border border-gray-300 px-4 py-2">{children}</td>,
+            table: ({children}) => <div className="overflow-x-auto mb-4"><table className="w-full border-collapse border border-blue-200">{children}</table></div>,
+            thead: ({children}) => <thead className="bg-blue-50">{children}</thead>,
+            th: ({children}) => <th className="border border-blue-200 px-4 py-2 text-left">{children}</th>,
+            td: ({children}) => <td className="border border-blue-200 px-4 py-2">{children}</td>,
             img: ({src, alt}) => <img src={src} alt={alt} className="max-w-full rounded-md my-4" />,
-            hr: () => <hr className="my-6 border-gray-300" />,
+            hr: () => <hr className="my-6 border-blue-200" />,
           }}
         >
           {note.content}
@@ -332,146 +333,132 @@ export default function NotePage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (!note) {
-    return (
-      <div className="p-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-gray-50 rounded-lg p-8 text-center">
-            <h3 className="text-lg font-medium text-gray-700">Note not found</h3>
-            <p className="mt-2 text-gray-500">The note you're looking for doesn't exist or you don't have permission to view it.</p>
-            <Button 
-              onClick={() => router.push('/dashboard')}
-              className="mt-4"
-              variant="outline"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      {loading ? (
+        <div className="flex justify-center items-center h-[60vh]">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+        </div>
+      ) : note ? (
+        <div className="relative">
+          {/* Back button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mb-4 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+            asChild
+          >
+            <Link href="/dashboard">
+              <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Dashboard
-            </Button>
+            </Link>
+          </Button>
+
+          {/* Document */}
+          <div className="bg-white rounded-lg overflow-hidden mt-4">
+            {state.mode === 'view' ? (
+              <ViewMode note={note} />
+            ) : (
+              <div className="p-4">
+                <h3 className="text-xs text-gray-500 mb-1">Title</h3>
+                <h1
+                  ref={titleRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="text-3xl font-bold mb-4 outline-none border border-transparent focus:border-blue-300 rounded-md p-2"
+                  onInput={handleContentChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      contentRef.current?.focus();
+                    }
+                  }}
+                ></h1>
+
+                <hr className="my-4 border-blue-100" />
+
+                <h3 className="text-xs text-gray-500 mb-1">Content (Markdown)</h3>
+                <div
+                  ref={contentRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  className="outline-none border border-transparent focus:border-blue-300 rounded-md p-2 min-h-[60vh] font-mono text-sm whitespace-pre-wrap"
+                  onInput={handleContentChange}
+                  onKeyDown={(e) => applyMarkdownShortcuts(e, contentRef)}
+                ></div>
+              </div>
+            )}
+          </div>
+
+          {/* Floating action buttons at top right */}
+          <div className="fixed top-8 right-8 flex flex-col gap-3 z-40">
+            {state.mode === 'view' ? (
+              <>
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg rounded-full h-14 w-14"
+                  onClick={handleEdit}
+                >
+                  <Edit className="h-6 w-6" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="bg-white text-red-500 border-red-500 hover:bg-red-50 shadow-lg rounded-full h-14 w-14"
+                  onClick={handleDelete}
+                  disabled={state.isDeleting}
+                >
+                  {state.isDeleting ? (
+                    <div className="animate-spin h-6 w-6 border-2 border-red-500 rounded-full border-t-transparent"></div>
+                  ) : (
+                    <Trash className="h-6 w-6" />
+                  )}
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg rounded-full h-14 w-14"
+                  onClick={handleSave}
+                  disabled={state.isSaving || !state.hasChanges}
+                >
+                  {state.isSaving ? (
+                    <div className="animate-spin h-6 w-6 border-2 border-white rounded-full border-t-transparent"></div>
+                  ) : (
+                    <Save className="h-6 w-6" />
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="bg-white text-gray-500 border-gray-300 hover:bg-gray-50 shadow-lg rounded-full h-14 w-14"
+                  onClick={handleCancelEdit}
+                >
+                  <X className="h-6 w-6" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <Button 
-            onClick={() => router.push('/dashboard')}
+      ) : (
+        <div className="text-center">
+          <h2 className="text-xl font-medium text-gray-700">Note not found</h2>
+          <p className="mt-2 text-gray-500">The note you're looking for doesn't exist or you don't have permission to view it.</p>
+          <Button
             variant="outline"
-            size="sm"
-            className="text-gray-600"
+            className="mt-4 border-blue-200 text-blue-500 hover:bg-blue-50"
+            asChild
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
+            <Link href="/dashboard">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Dashboard
+            </Link>
           </Button>
         </div>
-
-        <Card className="p-6 shadow-sm">
-          {isEditMode ? (
-            <>
-              <h1 
-                ref={titleRef}
-                contentEditable={true}
-                onInput={handleContentChange}
-                className="text-3xl font-bold text-gray-900 mb-2 outline-none border-b-2 border-transparent focus:border-blue-300 p-2"
-                spellCheck={true}
-                suppressContentEditableWarning={true}
-              />
-              
-              <div className="text-sm text-gray-500 mb-4">
-                {note.updated_at 
-                  ? `Last updated: ${new Date(note.updated_at).toLocaleString()}`
-                  : `Created: ${new Date(note.created_at).toLocaleString()}`
-                }
-                {state.hasChanges && <span className="ml-2 text-amber-500">(Unsaved changes)</span>}
-              </div>
-              
-              <hr className="my-4 border-gray-200" />
-              
-              <div
-                ref={contentRef}
-                contentEditable={true}
-                onInput={handleContentChange}
-                onKeyDown={(e) => applyMarkdownShortcuts(e, contentRef)}
-                className="markdown-editor prose max-w-none mt-4 outline-none min-h-[300px] p-2 focus:bg-gray-50 whitespace-pre-wrap font-mono text-gray-800"
-                spellCheck={true}
-                suppressContentEditableWarning={true}
-              />
-              
-              <div className="text-xs text-gray-500 mt-2 p-2">
-                <strong>Markdown shortcuts:</strong> Ctrl+B (bold), Ctrl+I (italic), Ctrl+` (code), Ctrl+K (link)<br/>
-                <strong>LaTeX shortcuts:</strong> Ctrl+M (inline math), Ctrl+Shift+M (block math)
-              </div>
-            </>
-          ) : (
-            // Use the separate view mode component with a key for forced re-renders
-            <ViewMode note={note} key={`view-${note.id}-${isEditMode}-${Date.now()}`} />
-          )}
-        </Card>
-      </div>
-
-      {/* Floating action buttons */}
-      <div className="fixed bottom-8 right-8 flex flex-col gap-3 z-50">
-        {state.mode === 'edit' ? (
-          <>
-            <Button 
-              type="button"
-              onClick={handleSave}
-              variant="default"
-              size="lg"
-              className={`${state.hasChanges ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400'} text-white shadow-lg rounded-full h-14 w-14 p-0 flex items-center justify-center transition-all duration-200`}
-              disabled={state.isSaving || !state.hasChanges}
-              title="Save"
-            >
-              <Save className="w-6 h-6" />
-            </Button>
-            <Button 
-              type="button"
-              onClick={handleCancelEdit}
-              variant="outline"
-              size="lg"
-              className="bg-white text-orange-500 border-orange-500 hover:bg-orange-50 shadow-lg rounded-full h-14 w-14 p-0 flex items-center justify-center transition-all duration-200"
-              title="Cancel"
-            >
-              <X className="w-6 h-6" />
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button 
-              type="button"
-              onClick={handleEdit}
-              variant="default"
-              size="lg"
-              className="bg-blue-500 hover:bg-blue-600 text-white shadow-lg rounded-full h-14 w-14 p-0 flex items-center justify-center transition-all duration-200"
-              title="Edit"
-            >
-              <Edit className="w-6 h-6" />
-            </Button>
-            <Button 
-              type="button"
-              onClick={handleDelete}
-              variant="outline"
-              size="lg"
-              className="bg-white text-red-500 border-red-500 hover:bg-red-50 shadow-lg rounded-full h-14 w-14 p-0 flex items-center justify-center transition-all duration-200"
-              disabled={state.isDeleting}
-              title="Delete"
-            >
-              <Trash className="w-6 h-6" />
-            </Button>
-          </>
-        )}
-      </div>
+      )}
     </div>
   );
 } 

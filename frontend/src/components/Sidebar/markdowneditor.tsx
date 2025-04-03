@@ -131,9 +131,9 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initia
           -webkit-text-fill-color: black !important;
         }
       `}</style>
-      <DialogContent className="sm:max-w-[800px] h-[80vh] flex flex-col">
+      <DialogContent className="sm:max-w-[800px] h-[80vh] flex flex-col bg-white">
         <DialogHeader>
-          <DialogTitle>{noteId ? 'Edit Note' : 'Edit Your Notes'}</DialogTitle>
+          <DialogTitle className="text-blue-500">{noteId ? 'Edit Note' : 'Edit Your Notes'}</DialogTitle>
           <DialogDescription>
             {noteId 
               ? 'Edit your existing note.' 
@@ -146,7 +146,7 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initia
             placeholder="Enter a title for your notes"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full"
+            className="w-full focus:border-blue-500 focus:ring-blue-500"
           />
         </div>
 
@@ -190,12 +190,17 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initia
 
 
         <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={onClose}>
+          <Button 
+            variant="outline" 
+            onClick={onClose}
+            className="border-gray-200 hover:bg-gray-50"
+          >
             Cancel
           </Button>
           <Button 
             onClick={handleSave}
             disabled={saving || !title.trim()}
+            className="bg-blue-500 hover:bg-blue-600 text-white"
           >
             {saving ? 'Saving...' : (noteId ? 'Update Notes' : 'Save Notes')}
           </Button>

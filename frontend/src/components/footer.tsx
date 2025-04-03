@@ -1,6 +1,21 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
+
 export default function Footer() {
+    const pathname = usePathname();
+    const isHomePage = pathname === "/";
+    const isSidebarLayout = pathname?.includes('/dashboard') || 
+                           pathname?.includes('/forum') || 
+                           pathname?.includes('/account') || 
+                           pathname?.includes('/profile') ||
+                           pathname?.includes('/settings') ||
+                           pathname?.includes('/upload') ||
+                           pathname?.includes('/calendar') ||
+                           pathname?.includes('/chat') ||
+                           pathname?.includes('/courses') ||
+                           pathname?.includes('/onboarding');
+
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
         if (element) {
@@ -8,6 +23,28 @@ export default function Footer() {
         }
     };
 
+    // Minimal footer for non-home pages
+    if (!isHomePage) {
+        return (
+            <footer className={`bg-white py-6 border-t border-gray-200 ${isSidebarLayout ? 'lg:pl-[250px]' : ''}`}>
+                <div className="max-w-6xl mx-auto px-4">
+                    <p className="text-center text-gray-500 text-sm">
+                        © 2024 SuperchargedNotes. All rights reserved. Developed by{' '}
+                        <a 
+                            href="https://arnavmalhotra.com" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-500 hover:text-blue-600 transition-colors"
+                        >
+                            Arnav Malhotra
+                        </a>
+                    </p>
+                </div>
+            </footer>
+        );
+    }
+
+    // Full footer for the home page
     return (
         <footer className="bg-gradient-to-b from-white to-blue-50 py-16">
             <div className="max-w-6xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-12">

@@ -72,7 +72,7 @@ export default function DashboardPage() {
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
                     </div>
                 ) : notes.length === 0 ? (
-                    <div className="bg-gray-50 rounded-lg p-8 text-center">
+                    <div className="bg-blue-50 rounded-lg p-8 text-center">
                         <h3 className="text-lg font-medium text-gray-700">No notes found</h3>
                         <p className="mt-2 text-gray-500">Upload your first document to get started</p>
                     </div>
@@ -81,7 +81,7 @@ export default function DashboardPage() {
                         {notes.map((note) => (
                             <Card 
                                 key={note.id} 
-                                className="hover:shadow-md transition-shadow overflow-hidden flex flex-col google-docs-card cursor-pointer"
+                                className="hover:shadow-md transition-shadow overflow-hidden flex flex-col google-docs-card cursor-pointer hover:border-blue-200"
                                 onClick={() => openNote(note.id)}
                             >
                                 <div className="flex flex-col h-full">
@@ -133,15 +133,15 @@ export default function DashboardPage() {
                                                             ul: ({children}) => <ul className="text-xs pl-4 my-1">{children}</ul>,
                                                             ol: ({children}) => <ol className="text-xs pl-4 my-1">{children}</ol>,
                                                             li: ({children}) => <li className="text-xs my-0.5">{children}</li>,
-                                                            blockquote: ({children}) => <blockquote className="text-xs italic border-l-2 border-gray-300 pl-2 my-1">{children}</blockquote>,
+                                                            blockquote: ({children}) => <blockquote className="text-xs italic border-l-2 border-blue-300 pl-2 my-1">{children}</blockquote>,
                                                             code: ({node, inline, className, children, ...props}: any) => {
                                                                 return inline 
-                                                                    ? <code className="bg-gray-100 px-1 py-0.5 rounded text-[10px] font-mono">{children}</code>
-                                                                    : <code className="bg-gray-50 text-gray-800 p-1 block rounded text-[10px] font-mono my-1 max-h-[40px] overflow-hidden">{children}</code>
+                                                                    ? <code className="bg-blue-50 px-1 py-0.5 rounded text-[10px] font-mono">{children}</code>
+                                                                    : <code className="bg-blue-50 text-gray-800 p-1 block rounded text-[10px] font-mono my-1 max-h-[40px] overflow-hidden">{children}</code>
                                                             },
                                                             pre: ({children}) => <pre className="my-1 max-h-[40px] overflow-hidden">{children}</pre>,
-                                                            img: () => <div className="text-[10px] text-gray-500 bg-gray-50 inline-block px-1 rounded">[Image]</div>,
-                                                            table: () => <div className="text-[10px] text-gray-500 bg-gray-50 inline-block px-1 rounded">[Table]</div>,
+                                                            img: () => <div className="text-[10px] text-gray-500 bg-blue-50 inline-block px-1 rounded">[Image]</div>,
+                                                            table: () => <div className="text-[10px] text-gray-500 bg-blue-50 inline-block px-1 rounded">[Table]</div>,
                                                             a: ({href, children}) => <a href={href} onClick={(e) => e.stopPropagation()} className="text-blue-500 text-xs hover:underline">{children}</a>,
                                                         }}
                                                     >

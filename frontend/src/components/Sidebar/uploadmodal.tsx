@@ -119,15 +119,17 @@ export function UploadModal() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
           <Button variant="ghost" className="bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors w-full justify-start">
-            <Upload className="w-4 h-4" />
+            <Upload className="w-4 h-4 mr-2" />
             Upload Notes
           </Button>
         </DialogTrigger>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] bg-white">
           <DialogHeader>
-            <DialogTitle>Upload Notes</DialogTitle>
+            <DialogTitle className="text-blue-500">Upload Notes</DialogTitle>
             <DialogDescription>
               Drag and drop your files here, or click to select files.
+              <br />
+              All the files you upload at once will be grouped together and processed as one note.
               <br />
               PSA: We currently cannot process diagrams, work in progress.
             </DialogDescription>
@@ -139,7 +141,7 @@ export function UploadModal() {
           >
             <input {...getInputProps()} />
             <div className="flex flex-col items-center gap-4">
-              <Upload className="w-12 h-12 text-gray-400" />
+              <Upload className="w-12 h-12 text-blue-400" />
               <div>
                 <p className="text-sm text-gray-600">
                   {isDragActive
@@ -158,14 +160,14 @@ export function UploadModal() {
               <h4 className="text-sm font-medium">Selected files:</h4>
               <div className="max-h-40 overflow-y-auto space-y-1">
                 {files.map((file, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm p-2 bg-gray-50 rounded justify-between">
+                  <div key={index} className="flex items-center gap-2 text-sm p-2 bg-blue-50 rounded justify-between">
                     <div className="flex items-center gap-2 truncate">
                       {file.type.includes('pdf') ? (
                         <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
                       ) : file.type.includes('image') ? (
                         <Image className="w-4 h-4 text-blue-500 flex-shrink-0" />
                       ) : (
-                        <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                        <File className="w-4 h-4 text-blue-500 flex-shrink-0" />
                       )}
                       <span className="truncate">{file.name}</span>
                     </div>
@@ -174,7 +176,7 @@ export function UploadModal() {
                         e.stopPropagation();
                         removeFile(index);
                       }}
-                      className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
+                      className="p-1 hover:bg-blue-100 rounded-full flex-shrink-0"
                       aria-label="Remove file"
                     >
                       <X className="w-3 h-3 text-gray-500" />
@@ -189,7 +191,7 @@ export function UploadModal() {
             <Button 
               onClick={handleUpload} 
               disabled={files.length === 0 || uploading}
-              className="w-full"
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white"
             >
               {uploading ? 'Uploading...' : 'Upload Files'}
             </Button>

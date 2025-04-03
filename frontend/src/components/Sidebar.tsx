@@ -1,7 +1,7 @@
 'use client';
 
 import { UserButton, SignOutButton } from '@clerk/nextjs';
-import { Home, Book, Settings, LogOut, Upload, ChevronDown, ChevronRight, Menu } from 'lucide-react';
+import { Home, Book, Settings, LogOut, Upload, ChevronDown, ChevronRight, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from './ui/button';
@@ -41,25 +41,38 @@ export default function Sidebar() {
 
     return (
         <>
-            <button
-                className="lg:hidden fixed bottom-4 left-4 p-3 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-                <Menu className="w-6 h-6 text-gray-700" />
-            </button>
+            {/* Hamburger menu - only show when menu is closed */}
+            {!isMobileMenuOpen && (
+                <button
+                    className="lg:hidden fixed bottom-4 right-4 p-3 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow z-[60]"
+                    onClick={() => setIsMobileMenuOpen(true)}
+                >
+                    <Menu className="w-6 h-6 text-blue-500" />
+                </button>
+            )}
+
+            {/* Close button - only show when menu is open */}
+            {isMobileMenuOpen && (
+                <button
+                    className="lg:hidden fixed bottom-4 right-4 p-3 rounded-full bg-white shadow-lg hover:shadow-xl transition-shadow z-[60]"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                >
+                    <X className="w-6 h-6 text-blue-500" />
+                </button>
+            )}
 
             <div className={`
-                fixed inset-y-0 left-0 z-50 
+                fixed inset-y-0 left-0 z-[55]
                 transform transition-transform duration-300 ease-in-out
-                lg:relative lg:translate-x-0
+                lg:h-screen lg:translate-x-0 lg:w-[250px] 
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-                flex h-full w-[250px] flex-col bg-white border-r
+                flex flex-col bg-white border-r overflow-y-auto
             `}>
-                <div className="p-6">
-                    <h2 className="text-xl font-bold text-gray-800">SuperchargedNotes</h2>
+                <div className="p-6 flex-shrink-0">
+                    <h2 className="text-xl font-bold text-blue-500">SuperchargedNotes</h2>
                 </div>
                 
-                <div className="flex-1 px-4">
+                <div className="flex-1 px-4 overflow-y-auto">
                     <nav className="space-y-2">
                         {navItems.map((item) => {
                             const isActive = pathname === item.href;
@@ -69,8 +82,8 @@ export default function Sidebar() {
                                     href={item.href}
                                     className={`flex items-center gap-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                                         ${isActive 
-                                            ? 'bg-gray-100 text-gray-900' 
-                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                            ? 'bg-blue-50 text-blue-500' 
+                                            : 'text-gray-600 hover:text-blue-500 hover:bg-blue-50'
                                         }`}
                                 >
                                     {item.icon}
@@ -82,9 +95,9 @@ export default function Sidebar() {
                         <button
                             onClick={() => setIsNotesOpen(!isNotesOpen)}
                             className={`flex items-center justify-between w-full gap-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                                ${pathname.startsWith('/dashboard/notes')
-                                    ? 'bg-gray-100 text-gray-900'
-                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                ${pathname.startsWith('/dashboard/notes') || pathname.startsWith('/notes/')
+                                    ? 'bg-blue-50 text-blue-500'
+                                    : 'text-gray-600 hover:text-blue-500 hover:bg-blue-50'
                                 }`}
                         >
                             <div className="flex items-center gap-x-3">
@@ -102,8 +115,8 @@ export default function Sidebar() {
                                         href={note.href}
                                         className={`flex items-center gap-x-3 px-3 py-2 rounded-lg text-sm transition-colors
                                             ${pathname === note.href
-                                                ? 'bg-gray-100 text-gray-900'
-                                                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                                                ? 'bg-blue-50 text-blue-500'
+                                                : 'text-gray-500 hover:text-blue-500 hover:bg-blue-50'
                                             }`}
                                     >
                                         {note.title}
@@ -116,11 +129,11 @@ export default function Sidebar() {
                     </nav>
                 </div>
 
-                <div className="mt-auto p-4 border-t">
+                <div className="mt-auto p-4 border-t flex-shrink-0">
                     <div className="flex flex-col gap-y-2">
                         <Button 
                             variant="ghost" 
-                            className="h-10 w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                            className="h-10 w-full justify-start text-gray-600 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                             <Settings className="w-4 h-4 mr-2" />
                             Settings
@@ -128,7 +141,7 @@ export default function Sidebar() {
                         
                         <Button 
                             variant="ghost" 
-                            className="h-10 w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                            className="h-10 w-full justify-start text-gray-600 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                             <LogOut className="w-4 h-4 mr-2" />
                             <SignOutButton />
@@ -136,7 +149,7 @@ export default function Sidebar() {
                         
                         <Button 
                             variant="ghost" 
-                            className="h-10 w-full justify-start text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+                            className="h-10 w-full justify-start text-gray-600 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                             <UserButton showName={true} />
                         </Button>
@@ -147,7 +160,7 @@ export default function Sidebar() {
             {/* Overlay for mobile */}
             {isMobileMenuOpen && (
                 <div 
-                    className="fixed inset-0 z-40 lg:hidden"
+                    className="fixed inset-0 z-[54] lg:hidden"
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
             )}
