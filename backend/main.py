@@ -62,7 +62,7 @@ def process_file(file_path: str, original_filename: str = None):
 4. Use bullet points and numbered lists where appropriate
 5. Preserve any tables using markdown table format
 6. Add bold and italic formatting for emphasis
-7. Keep all original diagrams and figures with proper captions
+7. Do not include diagrams
 8. Include proper code blocks with syntax highlighting if applicable
 """
             

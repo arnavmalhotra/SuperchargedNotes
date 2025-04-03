@@ -110,4 +110,221 @@ textarea.w-md-editor-text-input {
 /* Container background */
 .markdown-editor-container {
   background-color: white !important;
+}
+
+/* Dashboard card markdown previews */
+.markdown-body.prose-sm {
+  font-size: 0.875rem !important;
+  line-height: 1.4 !important;
+  overflow: hidden !important;
+}
+
+.markdown-body.prose-sm h1,
+.markdown-body.prose-sm h2,
+.markdown-body.prose-sm h3 {
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.25rem !important;
+  font-weight: 600 !important;
+}
+
+.markdown-body.prose-sm p {
+  margin-top: 0.25rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.markdown-body.prose-sm ul,
+.markdown-body.prose-sm ol {
+  padding-left: 1rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.markdown-body.prose-sm li {
+  margin-top: 0.1rem !important;
+  margin-bottom: 0.1rem !important;
+}
+
+.markdown-body.prose-sm code {
+  font-size: 0.75rem !important;
+  padding: 0.1rem 0.2rem !important;
+}
+
+.markdown-body.prose-sm blockquote {
+  margin: 0.5rem 0 !important;
+  padding-left: 0.5rem !important;
+  border-left-width: 2px !important;
+}
+
+.markdown-body.prose-sm img {
+  max-height: 80px !important;
+  object-fit: cover !important;
+}
+
+/* Style to create a gradual fade effect at the bottom of the preview */
+.markdown-body.line-clamp-3 {
+  position: relative !important;
+}
+
+.markdown-body.line-clamp-3::after {
+  content: '' !important;
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 40px !important;
+  background: linear-gradient(to bottom, transparent, white) !important;
+  pointer-events: none !important;
+}
+
+/* Google Docs-like preview styling */
+.google-docs-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24) !important;
+  transition: all 0.2s cubic-bezier(.25,.8,.25,1) !important;
+  border-radius: 2px !important;
+  border: none !important;
+  background-color: #fff !important;
+  max-height: 250px !important;
+  width: 100% !important;
+  aspect-ratio: 4/3 !important;
+  position: relative !important;
+}
+
+/* Hover effect to indicate clickability */
+.google-docs-card:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15), 0 4px 6px rgba(0, 0, 0, 0.1) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Active state when clicking */
+.google-docs-card:active {
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(0) !important;
+}
+
+/* Cursor style */
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+.docs-preview-wrapper {
+  position: relative !important;
+  height: 190px !important;
+  overflow: hidden !important;
+  background: #fff !important;
+  border-top: 1px solid #e0e0e0 !important;
+  border-bottom: 1px solid #e0e0e0 !important;
+}
+
+.docs-preview {
+  height: 100% !important;
+  overflow: hidden !important;
+  position: relative !important;
+  padding-top: 4px !important;
+}
+
+.docs-preview::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 40px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1));
+  pointer-events: none;
+}
+
+.document-content {
+  font-family: 'Arial', 'Helvetica', sans-serif !important;
+  color: #202124 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  letter-spacing: 0 !important;
+  padding-bottom: 40px !important; /* Space for fade effect */
+}
+
+/* Heading styles for Google Docs look */
+.document-content h1 {
+  color: #202124 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  margin-top: 8px !important;
+  margin-bottom: 4px !important;
+  border-bottom: none !important;
+}
+
+.document-content h2 {
+  color: #202124 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  margin-top: 6px !important;
+  margin-bottom: 3px !important;
+  border-bottom: none !important;
+}
+
+.document-content h3 {
+  color: #202124 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  margin-top: 5px !important;
+  margin-bottom: 2px !important;
+}
+
+.document-content p {
+  color: #202124 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  margin-top: 2px !important;
+  margin-bottom: 3px !important;
+}
+
+.document-content ul,
+.document-content ol {
+  padding-left: 16px !important;
+  margin-top: 2px !important;
+  margin-bottom: 3px !important;
+}
+
+.document-content li {
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  margin-top: 1px !important;
+  margin-bottom: 1px !important;
+}
+
+.document-content a {
+  color: #1a73e8 !important;
+  text-decoration: none !important;
+}
+
+.document-content blockquote {
+  border-left: 3px solid #dadce0 !important;
+  padding-left: 8px !important;
+  margin: 4px 0 !important;
+  font-style: italic !important;
+  color: #5f6368 !important;
+}
+
+/* Create subtle shadow on the card edges to mimic Google Docs previews */
+.hover\:shadow-md:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Adjust margins and padding for Google Docs look */
+.markdown-body.prose-sm {
+  font-family: 'Arial', sans-serif !important;
+  color: #222 !important;
+  line-height: 1.5 !important;
+  padding-top: 8px !important;
+}
+
+/* Document page styling */
+.markdown-body.prose-sm p:first-of-type {
+  margin-top: 0 !important;
+}
+
+/* Spacing between elements to mimic Google Docs */
+.markdown-body.prose-sm > * + * {
+  margin-top: 6px !important;
 } 

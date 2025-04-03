@@ -6,7 +6,7 @@ export default function SidebarLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex min-h-[calc(100vh-64px)] bg-gray-50">
+        <div className="flex min-h-[calc(100vh-64px)] bg-white">
             <Sidebar />
             <main className="flex-1 overflow-y-auto pb-16">
                 {children}

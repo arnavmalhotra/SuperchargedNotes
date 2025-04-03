@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Upload, FileText, Image, File } from "lucide-react"
+import { Upload, FileText, Image, File, X } from "lucide-react"
 import { useCallback, useState } from "react"
 import { useDropzone } from "react-dropzone"
 import axios from "axios"
@@ -50,7 +50,7 @@ export function UploadModal() {
   const { refreshNotes } = useNotes()
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(acceptedFiles)
+    setFiles(prevFiles => [...prevFiles, ...acceptedFiles])
   }, [])
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -110,6 +110,10 @@ export function UploadModal() {
     refreshNotes();
   }
 
+  const removeFile = (indexToRemove: number) => {
+    setFiles(files.filter((_, index) => index !== indexToRemove))
+  }
+
   return (
     <>
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -124,6 +128,8 @@ export function UploadModal() {
             <DialogTitle>Upload Notes</DialogTitle>
             <DialogDescription>
               Drag and drop your files here, or click to select files.
+              <br />
+              PSA: We currently cannot process diagrams, work in progress.
             </DialogDescription>
           </DialogHeader>
           <div 
@@ -152,15 +158,27 @@ export function UploadModal() {
               <h4 className="text-sm font-medium">Selected files:</h4>
               <div className="max-h-40 overflow-y-auto space-y-1">
                 {files.map((file, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm p-2 bg-gray-50 rounded">
-                    {file.type.includes('pdf') ? (
-                      <FileText className="w-4 h-4 text-red-500" />
-                    ) : file.type.includes('image') ? (
-                      <Image className="w-4 h-4 text-blue-500" />
-                    ) : (
-                      <File className="w-4 h-4 text-gray-500" />
-                    )}
-                    <span className="truncate">{file.name}</span>
+                  <div key={index} className="flex items-center gap-2 text-sm p-2 bg-gray-50 rounded justify-between">
+                    <div className="flex items-center gap-2 truncate">
+                      {file.type.includes('pdf') ? (
+                        <FileText className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      ) : file.type.includes('image') ? (
+                        <Image className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                      ) : (
+                        <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                      )}
+                      <span className="truncate">{file.name}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(index);
+                      }}
+                      className="p-1 hover:bg-gray-200 rounded-full flex-shrink-0"
+                      aria-label="Remove file"
+                    >
+                      <X className="w-3 h-3 text-gray-500" />
+                    </button>
                   </div>
                 ))}
               </div>
