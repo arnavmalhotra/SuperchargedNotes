@@ -10,6 +10,9 @@ class NoteBase(BaseModel):
 class NoteCreate(NoteBase):
     pass
 
+class NoteUpdate(NoteBase):
+    pass
+
 class Note(NoteBase):
     id: int
     created_at: datetime

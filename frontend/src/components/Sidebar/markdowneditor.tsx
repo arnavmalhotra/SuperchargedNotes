@@ -18,14 +18,16 @@ interface MarkdownEditorProps {
   onClose: () => void
   initialContent: string
   userId: string
+  initialTitle?: string
+  noteId?: number | null
 }
 
-export function MarkdownEditor({ isOpen, onClose, initialContent, userId }: MarkdownEditorProps) {
+export function MarkdownEditor({ isOpen, onClose, initialContent, userId, initialTitle = '', noteId = null }: MarkdownEditorProps) {
   const [content, setContent] = useState(initialContent)
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(initialTitle)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const { addNote } = useNotes()
+  const { addNote, refreshNotes } = useNotes()
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -42,14 +44,20 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId }: Mark
         content,
         user_id: userId
       }
-      console.log('Saving note with payload:', payload)
-      console.log('API URL:', process.env.NEXT_PUBLIC_API_URL)
       
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/save`, payload)
-      console.log('Save response:', response.data)
+      let response;
       
-      // Add the note to the context so it shows up immediately
-      addNote(response.data)
+      if (noteId) {
+        // Update existing note
+        response = await axios.put(`${process.env.NEXT_PUBLIC_API_URL}/notes/${noteId}`, payload)
+        console.log('Update response:', response.data)
+        refreshNotes()
+      } else {
+        // Create new note
+        response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/save`, payload)
+        console.log('Save response:', response.data)
+        addNote(response.data)
+      }
       
       onClose()
     } catch (error: any) {
@@ -87,9 +95,11 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId }: Mark
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Edit Your Notes</DialogTitle>
+          <DialogTitle>{noteId ? 'Edit Note' : 'Edit Your Notes'}</DialogTitle>
           <DialogDescription>
-            Review and edit the generated notes before saving.
+            {noteId 
+              ? 'Edit your existing note.' 
+              : 'Review and edit the generated notes before saving.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -125,7 +135,7 @@ export function MarkdownEditor({ isOpen, onClose, initialContent, userId }: Mark
             onClick={handleSave}
             disabled={saving || !title.trim()}
           >
-            {saving ? 'Saving...' : 'Save Notes'}
+            {saving ? 'Saving...' : (noteId ? 'Update Notes' : 'Save Notes')}
           </Button>
         </DialogFooter>
       </DialogContent>

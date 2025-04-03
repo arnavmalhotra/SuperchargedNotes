@@ -29,11 +29,22 @@ const acceptedFileTypes = {
   'text/csv': ['.csv']
 }
 
+interface Note {
+  id: number;
+  title: string;
+  content: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string | null;
+}
+
 export function UploadModal() {
   const [files, setFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
   const [showEditor, setShowEditor] = useState(false)
   const [generatedContent, setGeneratedContent] = useState('')
+  const [noteTitle, setNoteTitle] = useState('')
+  const [noteId, setNoteId] = useState<number | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const { userId } = useAuth()
   const { refreshNotes } = useNotes()
@@ -64,6 +75,8 @@ export function UploadModal() {
         },
       })
       setGeneratedContent(response.data.result)
+      setNoteTitle('')
+      setNoteId(null)
       setShowEditor(true)
       setFiles([])
     } catch (error) {
@@ -71,6 +84,23 @@ export function UploadModal() {
       alert('Failed to process your file. Please try again.')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const openNote = async (noteId: number) => {
+    try {
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/notes/${noteId}?user_id=${userId}`
+      )
+      const note: Note = response.data
+      setGeneratedContent(note.content)
+      setNoteTitle(note.title)
+      setNoteId(note.id)
+      setShowEditor(true)
+      setIsDialogOpen(false)
+    } catch (error) {
+      console.error('Failed to fetch note:', error)
+      alert('Failed to open note. Please try again.')
     }
   }
 
@@ -155,6 +185,8 @@ export function UploadModal() {
           onClose={handleEditorClose}
           initialContent={generatedContent}
           userId={userId || ''}
+          initialTitle={noteTitle}
+          noteId={noteId}
         />
       )}
     </>

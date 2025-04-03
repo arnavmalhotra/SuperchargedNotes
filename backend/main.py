@@ -160,6 +160,30 @@ async def get_note(note_id: int, user_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Note not found")
     return note
 
+@app.put("/notes/{note_id}", response_model=schemas.Note)
+async def update_note(note_id: int, note_update: schemas.NoteUpdate, db: Session = Depends(get_db)):
+    db_note = db.query(models.Note).filter(models.Note.id == note_id, models.Note.user_id == note_update.user_id).first()
+    if db_note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    # Update note fields
+    db_note.title = note_update.title
+    db_note.content = note_update.content
+    
+    db.commit()
+    db.refresh(db_note)
+    return db_note
+
+@app.delete("/notes/{note_id}", response_model=dict)
+async def delete_note(note_id: int, user_id: str, db: Session = Depends(get_db)):
+    db_note = db.query(models.Note).filter(models.Note.id == note_id, models.Note.user_id == user_id).first()
+    if db_note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    
+    db.delete(db_note)
+    db.commit()
+    return {"success": True, "message": "Note deleted successfully"}
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
