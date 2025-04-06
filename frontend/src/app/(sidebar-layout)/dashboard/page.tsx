@@ -133,7 +133,7 @@ export default function DashboardPage() {
                                                             ol: ({children}) => <ol className="text-xs pl-4 my-1">{children}</ol>,
                                                             li: ({children}) => <li className="text-xs my-0.5">{children}</li>,
                                                             blockquote: ({children}) => <blockquote className="text-xs italic border-l-2 border-blue-300 pl-2 my-1">{children}</blockquote>,
-                                                            code: ({ inline, children }) => {
+                                                            code: ({ inline, children }: any) => {
                                                                 return inline 
                                                                     ? <code className="bg-blue-50 px-1 py-0.5 rounded text-[10px] font-mono">{children}</code>
                                                                     : <code className="bg-blue-50 text-gray-800 p-1 block rounded text-[10px] font-mono my-1 max-h-[40px] overflow-hidden">{children}</code>
