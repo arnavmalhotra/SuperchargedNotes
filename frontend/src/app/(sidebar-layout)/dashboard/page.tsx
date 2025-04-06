@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
 import axios from 'axios';
-import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
 import { useNotes } from '@/contexts/NotesContext';
@@ -134,7 +133,7 @@ export default function DashboardPage() {
                                                             ol: ({children}) => <ol className="text-xs pl-4 my-1">{children}</ol>,
                                                             li: ({children}) => <li className="text-xs my-0.5">{children}</li>,
                                                             blockquote: ({children}) => <blockquote className="text-xs italic border-l-2 border-blue-300 pl-2 my-1">{children}</blockquote>,
-                                                            code: ({node, inline, className, children, ...props}: any) => {
+                                                            code: ({ inline, children }) => {
                                                                 return inline 
                                                                     ? <code className="bg-blue-50 px-1 py-0.5 rounded text-[10px] font-mono">{children}</code>
                                                                     : <code className="bg-blue-50 text-gray-800 p-1 block rounded text-[10px] font-mono my-1 max-h-[40px] overflow-hidden">{children}</code>
