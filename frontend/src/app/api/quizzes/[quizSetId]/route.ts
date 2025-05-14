@@ -4,11 +4,11 @@ import { supabase } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { quizSetId: string } }
+  { params }: { params: Promise<{ quizSetId: string }> }
 ) {
   try {
     const { userId } = await auth();
-    const { quizSetId } = params;
+    const { quizSetId } = await params;
 
     if (!userId) {
       return NextResponse.json(
@@ -81,11 +81,11 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { quizSetId: string } }
+  { params }: { params: Promise<{ quizSetId: string }> }
 ) {
   try {
     const { userId } = await auth();
-    const { quizSetId } = params;
+    const { quizSetId } = await params;
 
     if (!userId) {
       return NextResponse.json(
