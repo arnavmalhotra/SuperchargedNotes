@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { useRouter } from 'next/navigation';
 
 interface Note {
   id: string;
@@ -19,34 +20,71 @@ interface Note {
 
 export default function NotesPage() {
   const { user } = useUser();
+  const router = useRouter();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreatingFlashcards, setIsCreatingFlashcards] = useState<Record<string, boolean>>({});
   const [flashcardCreationError, setFlashcardCreationError] = useState<Record<string, string | null>>({});
+  const [isCreatingQuiz, setIsCreatingQuiz] = useState<Record<string, boolean>>({});
+  const [quizCreationError, setQuizCreationError] = useState<Record<string, string | null>>({});
+
+  const fetchNotes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/notes');
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to fetch notes');
+      }
+
+      setNotes(data.notes);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch notes');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchNotes = async () => {
-      try {
-        const response = await fetch('/api/notes');
-        const data = await response.json();
-
-        if (!data.success) {
-          throw new Error(data.message || 'Failed to fetch notes');
-        }
-
-        setNotes(data.notes);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch notes');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchNotes();
   }, []);
 
-  const handleCreateFlashcards = async (noteId: string) => {
+  const handleOpenNote = (noteId: string) => {
+    router.push(`/notes/${noteId}`);
+  };
+
+  const handleDeleteNote = async (e: React.MouseEvent, noteId: string) => {
+    e.stopPropagation(); // Prevent note opening when deleting
+    if (!window.confirm('Are you sure you want to delete this note and all its associated quizzes and flashcards?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/notes/${noteId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete note');
+      }
+      // Re-fetch notes to update the list
+      fetchNotes(); 
+      // Optionally, you might want to show a success toast/notification here
+      alert(data.message || 'Note deleted successfully');
+
+    } catch (err) {
+      console.error(`Error deleting note ${noteId}:`, err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred while deleting the note');
+      alert(`Error: ${err instanceof Error ? err.message : 'Failed to delete note'}`);
+    }
+  };
+
+  const handleCreateFlashcards = async (e: React.MouseEvent, noteId: string) => {
+    e.stopPropagation(); // Prevent note opening when creating flashcards
     if (!user?.id) {
       console.error("User not authenticated");
       setFlashcardCreationError(prev => ({ ...prev, [noteId]: "User not authenticated" }));
@@ -80,6 +118,43 @@ export default function NotesPage() {
       setFlashcardCreationError(prev => ({ ...prev, [noteId]: err instanceof Error ? err.message : 'An unknown error occurred' }));
     } finally {
       setIsCreatingFlashcards(prev => ({ ...prev, [noteId]: false }));
+    }
+  };
+
+  const handleCreateQuiz = async (e: React.MouseEvent, noteId: string) => {
+    e.stopPropagation(); // Prevent note opening when creating quiz
+    if (!user?.id) {
+      console.error("User not authenticated");
+      setQuizCreationError(prev => ({ ...prev, [noteId]: "User not authenticated" }));
+      return;
+    }
+
+    setIsCreatingQuiz(prev => ({ ...prev, [noteId]: true }));
+    setQuizCreationError(prev => ({ ...prev, [noteId]: null }));
+
+    try {
+      const response = await fetch('/api/quizzes/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ noteId, userId: user.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create quiz');
+      }
+
+      console.log('Quiz created successfully:', data.quizSet);
+      // Optionally, you can redirect or show a success message here
+
+    } catch (err) {
+      console.error(`Error creating quiz for note ${noteId}:`, err);
+      setQuizCreationError(prev => ({ ...prev, [noteId]: err instanceof Error ? err.message : 'An unknown error occurred' }));
+    } finally {
+      setIsCreatingQuiz(prev => ({ ...prev, [noteId]: false }));
     }
   };
 
@@ -126,7 +201,11 @@ export default function NotesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {notes.map((note) => (
-            <Card key={note.id} className="hover:shadow-lg transition-shadow">
+            <Card 
+              key={note.id} 
+              className="hover:shadow-lg transition-shadow cursor-pointer"
+              onClick={() => handleOpenNote(note.id)}
+            >
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
@@ -137,25 +216,44 @@ export default function NotesPage() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 flex-shrink-0"
+                        onClick={(e) => e.stopPropagation()} // Prevent note opening when clicking menu
+                      >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem 
-                        onSelect={() => handleCreateFlashcards(note.id)}
+                        onSelect={(e) => handleCreateFlashcards(e as unknown as React.MouseEvent, note.id)}
                         disabled={isCreatingFlashcards[note.id]}
                       >
                         {isCreatingFlashcards[note.id] ? 'Creating...' : 'Create Flashcards'}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => console.log(`Create Quizzes for note ${note.id}`)}>
-                        Create Quizzes
+                      <DropdownMenuItem 
+                        onSelect={(e) => handleCreateQuiz(e as unknown as React.MouseEvent, note.id)}
+                        disabled={isCreatingQuiz[note.id]}
+                      >
+                        {isCreatingQuiz[note.id] ? 'Creating...' : 'Create Quizzes'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onSelect={(e) => handleDeleteNote(e as unknown as React.MouseEvent, note.id)}
+                        className="text-red-600 hover:!text-red-600 hover:!bg-red-50"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Note
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
                 {flashcardCreationError[note.id] && (
-                  <p className="text-xs text-red-500 mt-1">Error: {flashcardCreationError[note.id]}</p>
+                  <p className="text-xs text-red-500 mt-1">Error creating flashcards: {flashcardCreationError[note.id]}</p>
+                )}
+                {quizCreationError[note.id] && (
+                  <p className="text-xs text-red-500 mt-1">Error creating quiz: {quizCreationError[note.id]}</p>
                 )}
               </CardHeader>
               <CardContent>

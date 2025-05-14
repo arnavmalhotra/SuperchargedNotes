@@ -8,6 +8,7 @@ import { UploadModal } from "@/components/dashboard/UploadModal";
 import { Button } from "./button";
 import { NotesProvider } from "@/contexts/NotesContext";
 import { useRef, useCallback } from "react";
+import { SearchBar } from "./search-bar";
 
 const Sidebar = () => {
   const { user } = useUser();
@@ -29,9 +30,15 @@ const Sidebar = () => {
     <NotesProvider refreshFunction={notesRef.current?.fetchNotes ?? (() => Promise.resolve())}>
       <div className="flex flex-col h-full w-64 bg-white border-r border-gray-200 shadow-sm">
         <div className="flex-1 p-4">
-          <div className="mb-8">
+          <div className="mb-4">
             <h2 className="text-xl font-bold text-gray-900">SuperchargedNotes</h2>
           </div>
+          
+          {/* Search Bar */}
+          <div className="mb-4">
+            <SearchBar />
+          </div>
+          
           <nav className="space-y-2">
             <div className="flex justify-end w-full mb-4">
               <UploadModal onUploadSuccess={handleUploadSuccess} />

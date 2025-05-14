@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Trash2, Edit3, PlusCircle, BookOpen } from 'lucide-react'; 
+import { Trash2, PlusCircle, BookOpen } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface IndividualFlashcard {
   id: string;
@@ -25,60 +25,66 @@ interface FlashcardSet {
 
 export default function FlashcardsPage() {
   const { user } = useUser();
+  const router = useRouter();
   const [flashcardSets, setFlashcardSets] = useState<FlashcardSet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchFlashcardSets = async () => {
-      if (!user?.id) return;
-
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch('/api/flashcards/list'); 
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-          throw new Error(data.message || 'Failed to fetch flashcard sets');
-        }
-        setFlashcardSets(data.flashcardSets || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching flashcards.');
-        console.error("Error fetching flashcard sets:", err);
-      } finally {
-        setLoading(false);
+  const fetchFlashcardSets = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/flashcards/list'); 
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to fetch flashcard sets');
       }
-    };
+      setFlashcardSets(data.flashcardSets || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching flashcards.');
+      console.error("Error fetching flashcard sets:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     if (user?.id) { // Ensure user is loaded before fetching
         fetchFlashcardSets();
     }
   }, [user]);
 
-  const handleDeleteSet = async (setId: string) => {
-    // Placeholder - TODO: Implement API call and UI update
-    console.log("Delete set:", setId);
-    alert("Delete functionality not yet implemented.");
+  const handleOpenFlashcardSet = (setId: string) => {
+    router.push(`/flashcards/${setId}`);
   };
 
-  const handleEditSet = (setId: string) => {
-    // Placeholder - TODO: Implement navigation or modal
-    console.log("Edit set:", setId);
-    alert("Edit functionality not yet implemented.");
-  };
-  
-  const handleStudySet = (setId: string) => {
-    // Placeholder - TODO: Implement navigation to study interface
-    console.log("Study set:", setId);
-    alert("Study functionality not yet implemented.");
+  const handleDeleteSet = async (e: React.MouseEvent, setId: string) => {
+    e.stopPropagation(); // Prevent navigating when deleting
+    if (!window.confirm('Are you sure you want to delete this flashcard set? This action cannot be undone.')) {
+      return;
+    }
+    try {
+      const response = await fetch(`/api/flashcards/${setId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to delete flashcard set');
+      }
+      alert(data.message || 'Flashcard set deleted successfully');
+      // Refetch flashcard sets to update the UI
+      fetchFlashcardSets();
+    } catch (err) {
+      console.error(`Error deleting flashcard set ${setId}:`, err);
+      alert(`Error: ${err instanceof Error ? err.message : 'Failed to delete flashcard set'}`);
+    }
   };
 
   if (loading && !user) {
     return (
       <div className="container mx-auto p-6 text-center">
         <p>Loading user information...</p>
-        {/* You could add a spinner here */}
       </div>
     );
   }
@@ -90,16 +96,19 @@ export default function FlashcardsPage() {
           <h1 className="text-3xl font-bold">My Flashcard Sets</h1>
           <Button disabled><PlusCircle className="mr-2 h-4 w-4" /> Create New Set</Button>
         </div>
-        <div className="space-y-4">
-          {[...Array(3)].map((_, i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
             <Card key={i} className="bg-white shadow rounded-lg">
               <CardHeader className="px-6 py-4">
                 <Skeleton className="h-6 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-1/4" />
+                <Skeleton className="h-4 w-1/2" />
               </CardHeader>
               <CardContent className="px-6 pt-0 pb-4">
-                <Skeleton className="h-10 w-full mt-2" />
+                <Skeleton className="h-4 w-full mt-2" />
               </CardContent>
+              <CardFooter className="px-6 py-4 border-t">
+                <Skeleton className="h-10 w-full" />
+              </CardFooter>
             </Card>
           ))}
         </div>
@@ -142,56 +151,39 @@ export default function FlashcardsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Accordion type="single" collapsible className="w-full space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {flashcardSets.map((set) => (
-            <AccordionItem value={set.id} key={set.id} className="bg-white shadow rounded-lg border-none">
-              <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-gray-50 rounded-t-lg">
-                <div className="flex-1 text-left">
-                  <h2 className="text-xl font-semibold text-gray-800">{set.title}</h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {set.individual_flashcards.length} cards - Created on {new Date(set.created_at).toLocaleDateString()}
-                  </p>
+            <Card 
+              key={set.id} 
+              className="bg-white shadow hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => handleOpenFlashcardSet(set.id)}
+            >
+              <CardHeader>
+                <CardTitle>{set.title}</CardTitle>
+                <CardDescription>
+                  {set.individual_flashcards.length} cards • Created on {new Date(set.created_at).toLocaleDateString()}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Set contains {set.individual_flashcards.length} flashcards.
+                </p>
+              </CardContent>
+              <CardFooter className="flex justify-between border-t pt-4">
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={(e) => handleDeleteSet(e, set.id)}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" /> Delete
+                </Button>
+                <div className="text-sm text-gray-500">
+                  Click to open flashcards
                 </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pt-0 pb-4 bg-white rounded-b-lg">
-                {set.individual_flashcards.length > 0 ? (
-                  <div className="space-y-3 mt-4">
-                    {set.individual_flashcards.map((card, index) => (
-                      <Card key={card.id} className="bg-gray-50 border border-gray-200">
-                        <CardHeader className="pb-2 pt-3 px-4">
-                           <CardTitle className="text-sm font-medium text-blue-700">Card {index + 1}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="px-4 pb-3 space-y-1">
-                          <div>
-                            <p className="font-semibold text-gray-700 text-xs">FRONT</p>
-                            <p className="text-gray-800">{card.front}</p>
-                          </div>
-                          <div>
-                            <p className="font-semibold text-gray-700 text-xs">BACK</p>
-                            <p className="text-gray-800">{card.back}</p>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 mt-4">This set has no flashcards.</p>
-                )}
-                <div className="mt-6 pt-4 border-t border-gray-200 flex justify-end space-x-2">
-                  <Button variant="default" size="sm" onClick={() => handleStudySet(set.id)}>
-                    <BookOpen className="mr-2 h-4 w-4" /> Study Set
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => handleEditSet(set.id)}>
-                    <Edit3 className="mr-1.5 h-4 w-4" /> Edit
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDeleteSet(set.id)}>
-                    <Trash2 className="mr-1.5 h-4 w-4" /> Delete
-                  </Button>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
+              </CardFooter>
+            </Card>
           ))}
-        </Accordion>
+        </div>
       )}
     </div>
   );

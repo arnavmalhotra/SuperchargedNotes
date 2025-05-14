@@ -22,6 +22,23 @@ interface UploadModalProps {
   onUploadSuccess?: () => void;
 }
 
+// Add a utility function to truncate filenames
+const truncateFilename = (filename: string, maxLength: number = 20): string => {
+  if (filename.length <= maxLength) return filename;
+  
+  const lastDotIndex = filename.lastIndexOf('.');
+  if (lastDotIndex === -1) {
+    return filename.slice(0, maxLength - 3) + '...';
+  }
+  
+  const name = filename.slice(0, lastDotIndex);
+  const extension = filename.slice(lastDotIndex);
+  
+  // Ensure we have at least 1 character of the name
+  const nameLength = Math.max(1, maxLength - extension.length - 3);
+  return name.slice(0, nameLength) + '...' + extension;
+};
+
 export function UploadModal({ onUploadSuccess }: UploadModalProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [groupFiles, setGroupFiles] = useState(false);
@@ -103,7 +120,7 @@ export function UploadModal({ onUploadSuccess }: UploadModalProps) {
           Upload Notes
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-w-[95vw] w-full">
         <DialogHeader>
           <DialogTitle>Upload Notes</DialogTitle>
           <DialogDescription>
@@ -132,24 +149,24 @@ export function UploadModal({ onUploadSuccess }: UploadModalProps) {
           </div>
 
           {files.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <Label>Selected Files</Label>
-              <div className="max-h-32 overflow-y-auto space-y-2">
+              <div className="max-h-32 overflow-y-auto overflow-x-hidden space-y-2 w-full">
                 {files.map((file, index) => (
-                  <div 
+                  <div
                     key={`${file.name}-${index}`}
-                    className="flex items-center justify-between bg-gray-50 p-2 rounded-md"
+                    className="flex items-center gap-2 bg-gray-50 p-2 rounded-md"
                   >
-                    <span className="text-sm text-gray-600 truncate flex-1 mr-2">
-                      {file.name}
-                    </span>
+                    <p className="text-sm text-gray-600 overflow-hidden min-w-0 flex-1">
+                      {truncateFilename(file.name, 20)}
+                    </p>
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => removeFile(file)}
-                      className="text-gray-500 hover:text-red-500"
+                      className="h-6 w-6 text-gray-500 hover:text-red-500"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="h-4 w-4" />
                     </Button>
                   </div>
                 ))}
