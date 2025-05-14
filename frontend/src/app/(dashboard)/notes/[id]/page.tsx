@@ -6,14 +6,31 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Edit2, Save, Download, FilePlus } from 'lucide-react';
-import MDEditor from '@uiw/react-md-editor';
+import CodeMirror from '@uiw/react-codemirror';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import 'katex/dist/katex.min.css';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-import 'katex/dist/katex.min.css';
 import rehypeSanitize from 'rehype-sanitize';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
+
+// Custom renderer components
+const ChemBlock = ({ children }: { children: string }) => (
+  <div className="chem-structure p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
+    <div className="text-gray-800 overflow-auto">
+      {children}
+    </div>
+  </div>
+);
+
+const CircuitBlock = ({ children }: { children: string }) => (
+  <div className="circuit-diagram p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
+    <div className="text-gray-800 overflow-auto">
+      {children}
+    </div>
+  </div>
+);
 
 interface Note {
   id: string;
@@ -29,7 +46,7 @@ export default function NoteDetailPage() {
   const router = useRouter();
   const params = useParams();
   const noteId = params.id as string;
-  const markdownRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +57,28 @@ export default function NoteDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
+  
+  // Custom components for ReactMarkdown
+  const components = {
+    code({ node, inline, className, children, ...props }: any) {
+      const match = /language-(\w+)/.exec(className || '');
+      const language = match ? match[1] : '';
+      
+      if (!inline && language === 'chem') {
+        return <ChemBlock>{String(children).replace(/\n$/, '')}</ChemBlock>;
+      }
+      
+      if (!inline && language === 'circuit') {
+        return <CircuitBlock>{String(children).replace(/\n$/, '')}</CircuitBlock>;
+      }
+      
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    }
+  };
 
   const fetchNote = async () => {
     if (!user?.id || !noteId) return;
@@ -78,6 +117,9 @@ export default function NoteDetailPage() {
       // Entering edit mode
       setEditedTitle(note?.title || '');
       setEditedContent(note?.content || '');
+    } else {
+      // Exiting edit mode without saving
+      // No content processing needed here
     }
   };
 
@@ -116,12 +158,12 @@ export default function NoteDetailPage() {
   };
 
   const handleExportToPdf = async () => {
-    if (!markdownRef.current) return;
+    if (!contentRef.current) return;
     
     setIsPdfExporting(true);
     
     try {
-      const element = markdownRef.current;
+      const element = contentRef.current;
       const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
@@ -263,30 +305,78 @@ export default function NoteDetailPage() {
         </div>
         
         {isEditing ? (
-          <div data-color-mode="light">
-            <MDEditor
+          <div className="border border-gray-300 rounded-lg">
+            <CodeMirror
               value={editedContent}
-              onChange={(value) => setEditedContent(value || '')}
-              height={600}
-              preview="edit"
-              hideToolbar={false}
-              enableScroll={true}
+              onChange={setEditedContent}
+              height="600px"
+              className="text-base"
+              theme="light"
             />
+            <div className="p-3 bg-gray-50 border-t">
+              <p className="text-xs text-gray-500">
+                <strong>Markdown and LaTeX Tips:</strong> 
+                Use standard Markdown for formatting. For equations, use $...$ for inline math and $$...$$ for display equations.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                For chemistry formulas, use <code>$\ce&#123;H2O&#125;$</code> for inline or <code>$$\ce&#123;H2O&#125;$$</code> for display formulas.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                For circuit diagrams, use <code>```circuit</code> with your diagram content and end with <code>```</code>. 
+                For complex chemical structures, use <code>```chem</code> with your structure and end with <code>```</code>.
+              </p>
+            </div>
           </div>
         ) : (
           <div 
-            ref={markdownRef}
-            className="prose prose-sm sm:prose lg:prose-lg max-w-none bg-white p-6 rounded-lg shadow-sm border"
+            ref={contentRef}
+            className="prose prose-sm sm:prose lg:prose-lg max-w-none bg-white p-6 rounded-lg shadow-sm border markdown-content"
           >
             <ReactMarkdown
               remarkPlugins={[remarkMath]}
-              rehypePlugins={[rehypeKatex, rehypeSanitize]}
+              rehypePlugins={[
+                [rehypeKatex, { 
+                  output: 'html',
+                  throwOnError: false, 
+                  strict: false,
+                  trust: true
+                }], 
+                rehypeSanitize
+              ]}
+              components={components}
             >
               {note.content}
             </ReactMarkdown>
           </div>
         )}
       </div>
+
+      {/* Add custom styles for content */}
+      <style jsx global>{`
+        .markdown-content .katex-display {
+          margin: 1.5em 0;
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 0.5em 0;
+        }
+        
+        .markdown-content .katex {
+          font-size: 1.1em;
+        }
+        
+        .markdown-content .katex-display > .katex {
+          font-size: 1.21em;
+        }
+        
+        /* Load mhchem extension for KaTeX */
+        @import url('https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/mhchem.min.css');
+        
+        @media (max-width: 640px) {
+          .markdown-content .katex-display {
+            font-size: 0.85em;
+          }
+        }
+      `}</style>
     </div>
   );
 } 

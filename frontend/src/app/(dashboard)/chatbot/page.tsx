@@ -2,12 +2,35 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, Loader2, Zap, BookOpen, FileText, Brain, FileQuestion, X } from 'lucide-react';
+import 'katex/dist/katex.min.css';
 import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import rehypeSanitize from 'rehype-sanitize';
+
+// Custom renderer components
+const ChemBlock = ({ children }: { children: string }) => (
+  <div className="chem-structure p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
+    <div className="text-gray-800 overflow-auto">
+      {children}
+    </div>
+  </div>
+);
+
+const CircuitBlock = ({ children }: { children: string }) => (
+  <div className="circuit-diagram p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
+    <div className="text-gray-800 overflow-auto">
+      {children}
+    </div>
+  </div>
+);
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
   isStreaming?: boolean;
+  processedContent?: string;
+  remainingContent?: string;
 }
 
 type ResponseType = 'quick' | 'detailed';
@@ -116,6 +139,56 @@ export default function ChatbotPage() {
     }
   };
 
+  // Process special content not handled by React-Markdown + KaTeX
+  const processSpecialContent = (content: string): { processedContent: string, remainingContent: string } => {
+    if (!content) return { processedContent: '', remainingContent: '' };
+    
+    let remainingContent = content;
+    let processedContent = '';
+    
+    // Handle circuit diagrams with special syntax
+    remainingContent = remainingContent.replace(/```circuit\n([\s\S]*?)```/g, (match, circuit) => {
+      processedContent += `<div class="circuit-diagram-placeholder p-4 border border-dashed border-gray-300 rounded-md bg-gray-50 text-center">
+                <p class="text-gray-500"><strong>Circuit Diagram:</strong></p>
+                <pre class="text-xs text-left mt-2 bg-gray-100 p-2 rounded overflow-auto">${circuit}</pre>
+              </div>`;
+      return ''; // Remove from remaining content
+    });
+
+    // Handle organic chemistry advanced notations if needed
+    remainingContent = remainingContent.replace(/```chem\n([\s\S]*?)```/g, (match, chem) => {
+      processedContent += `<div class="chem-structure-placeholder p-4 border border-dashed border-gray-300 rounded-md bg-gray-50 text-center">
+                <p class="text-gray-500"><strong>Chemical Structure:</strong></p>
+                <pre class="text-xs text-left mt-2 bg-gray-100 p-2 rounded overflow-auto">${chem}</pre>
+              </div>`;
+      return ''; // Remove from remaining content
+    });
+    
+    return { processedContent, remainingContent };
+  };
+
+  // Custom components for ReactMarkdown
+  const components = {
+    code({ node, inline, className, children, ...props }: any) {
+      const match = /language-(\w+)/.exec(className || '');
+      const language = match ? match[1] : '';
+      
+      if (!inline && language === 'chem') {
+        return <ChemBlock>{String(children).replace(/\n$/, '')}</ChemBlock>;
+      }
+      
+      if (!inline && language === 'circuit') {
+        return <CircuitBlock>{String(children).replace(/\n$/, '')}</CircuitBlock>;
+      }
+      
+      return (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    }
+  };
+
   // Handle submit message
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,6 +280,12 @@ export default function ChatbotPage() {
                 setMessages(prevMessages => {
                   const newMessages = [...prevMessages];
                   newMessages[newMessages.length - 1].content = responseText;
+                  
+                  // Process special content like circuit diagrams and chemistry structures
+                  const { processedContent, remainingContent } = processSpecialContent(responseText);
+                  newMessages[newMessages.length - 1].processedContent = processedContent;
+                  newMessages[newMessages.length - 1].remainingContent = remainingContent || responseText;
+                  
                   return newMessages;
                 });
               }
@@ -293,13 +372,31 @@ export default function ChatbotPage() {
                     className={`max-w-3xl rounded-2xl px-6 py-4 ${
                       message.role === 'user'
                         ? 'bg-blue-600 text-white'
-                        : 'bg-white border border-gray-200'
+                        : 'bg-white border border-gray-200 markdown-content'
                     }`}
                   >
                     {message.isStreaming ? (
                       <div>
                         <div className="prose prose-sm max-w-none">
-                          <ReactMarkdown>{message.content || ''}</ReactMarkdown>
+                          {message.role === 'assistant' ? (
+                            <ReactMarkdown
+                              remarkPlugins={[remarkMath]}
+                              rehypePlugins={[
+                                [rehypeKatex, { 
+                                  output: 'html',
+                                  throwOnError: false, 
+                                  strict: false,
+                                  trust: true
+                                }], 
+                                rehypeSanitize
+                              ]}
+                              components={components}
+                            >
+                              {message.content || ''}
+                            </ReactMarkdown>
+                          ) : (
+                            message.content
+                          )}
                         </div>
                         <div className="mt-2 flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin opacity-70" />
@@ -308,7 +405,25 @@ export default function ChatbotPage() {
                       </div>
                     ) : (
                       <div className="prose prose-sm max-w-none">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                        {message.role === 'assistant' ? (
+                          <ReactMarkdown
+                            remarkPlugins={[remarkMath]}
+                            rehypePlugins={[
+                              [rehypeKatex, { 
+                                output: 'html',
+                                throwOnError: false, 
+                                strict: false,
+                                trust: true
+                              }], 
+                              rehypeSanitize
+                            ]}
+                            components={components}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        ) : (
+                          message.content
+                        )}
                       </div>
                     )}
                   </div>
@@ -354,7 +469,7 @@ export default function ChatbotPage() {
           </div>
           
           {/* Input form */}
-          <form onSubmit={handleSubmit} className="flex border rounded-xl shadow-sm bg-white p-2">
+          <form onSubmit={handleSubmit} className="flex flex-col border rounded-xl shadow-sm bg-white p-2">
             <textarea
               ref={textareaRef}
               value={inputMessage}
@@ -364,17 +479,22 @@ export default function ChatbotPage() {
               className="min-h-[48px] max-h-[120px] resize-none flex-1 border-0 focus:ring-0 focus:outline-none bg-transparent p-2"
               disabled={isLoading || isLoadingDocuments || !!documentError}
             />
-            <button 
-              type="submit" 
-              className="h-12 w-12 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:bg-blue-400 self-end ml-2"
-              disabled={isLoading || !inputMessage.trim()}
-            >
-              {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-5 w-5" />
-              )}
-            </button>
+            <div className="flex items-center justify-between px-2 pt-1 pb-0">
+              <div className="text-xs text-gray-500">
+                <span className="italic">Markdown and LaTeX supported</span>
+              </div>
+              <button 
+                type="submit" 
+                className="h-10 w-10 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:bg-blue-400 self-end"
+                disabled={isLoading || (!inputMessage.trim() && !selectedContextDocument)}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </button>
+            </div>
           </form>
 
           {/* Document Selector Popover */}
@@ -440,6 +560,43 @@ export default function ChatbotPage() {
           )}
         </div>
       </div>
+
+      {/* Add custom styles for content */}
+      <style jsx global>{`
+        .markdown-content .katex-display {
+          margin: 1em 0;
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 0.5em 0;
+        }
+        
+        .markdown-content .katex {
+          font-size: 1em;
+        }
+        
+        .markdown-content .katex-display > .katex {
+          font-size: 1.1em;
+        }
+        
+        .circuit-diagram-placeholder,
+        .chem-structure-placeholder {
+          margin: 1em 0;
+        }
+        
+        /* Hide duplicate content to prevent it from rendering twice */
+        .markdown-body:has(+ .circuit-chem-handler) pre {
+          display: none;
+        }
+        
+        /* Load mhchem extension for KaTeX */
+        @import url('https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/mhchem.min.css');
+        
+        @media (max-width: 640px) {
+          .markdown-content .katex-display {
+            font-size: 0.8em;
+          }
+        }
+      `}</style>
     </div>
   );
 }

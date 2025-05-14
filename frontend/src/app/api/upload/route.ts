@@ -48,12 +48,12 @@ async function processFileWithGemini(file: File) {
 
     // For PDFs, ask for a summary
     // For images, ask for a description and any text extraction
-    const prompt = file.type === 'application/pdf' 
-      ? "Give me a detailed summary of this PDF file, including any key points and important information."
-      : "Please analyze this image. Extract any text if present, and provide a detailed description of what you see.";
+    const prompt = file.type === 'application/pdf'
+      ? "You are an expert chemistry tutor. Your task is to create a comprehensive and clear study note from this PDF file.\\\\nUse Markdown formatting for your response.\\\\nFor **mathematical expressions**, use LaTeX notation:\\\\n- Inline math: `$E = mc^2$`\\\\n- Display math: `$$K_a = \\\\frac{[H^+][A^-]}{[HA]}$$`\\\\nFor **chemical formulae and reaction schemes**, use the `\\\\ce{}` command, which will be rendered. Examples:\\\\n- Formula: `\\\\ce{H2O}`, `\\\\ce{CH3COOH}`\\\\n- Reaction: `\\\\ce{2H2 + O2 -> 2H2O}`\\\\n- Reaction with conditions: `\\\\ce{A + B ->[catalyst][heat] C + D}`\\\\nFor **detailed 2D molecular structural formulae**, use `chemfig` LaTeX syntax within ` \\`\\`\\`chem ... \\`\\`\\` ` blocks. This code will be displayed as is. Examples:\\\\n- Simple chain: `\\\\chemfig{CH_3-CH_2-OH}`\\\\n- Benzene: `\\\\chemfig{*6(=-=--=)}`\\\\n- Acetic Acid: `\\\\chemfig{C(-[2]H)(-[4]H)(-[6]H)-C(=[1]O)-[7]OH}`\\\\nIf the document contains circuit diagrams, describe them within ` \\`\\`\\`circuit ... \\`\\`\\` ` blocks.\\\\nStructure the note logically with headings, lists, and emphasis. Explain key chemical concepts clearly. If appropriate, include practice questions or points for further study based on the document\\\'s content to enhance its value as a study aid."
+      : "You are an expert chemistry tutor. Analyze this image and provide a detailed description and explanation.\\\\nUse Markdown formatting for your response.\\\\nIf the image contains text, extract and present it.\\\\nIf the image displays **mathematical expressions**, represent them using LaTeX notation:\\\\n- Inline math: `$E = mc^2$`\\\\n- Display math: `$$K_a = \\\\frac{[H^+][A^-]}{[HA]}$$`\\\\nIf the image shows **chemical formulae or reaction schemes**, describe them and use the `\\\\ce{}` command. Examples:\\\\n- Formula: `\\\\ce{H2O}`\\\\n- Reaction: `\\\\ce{SO3 + H2O -> H2SO4}`\\\\nIf the image depicts **detailed 2D molecular structural formulae**, describe them. If you are confident in generating the `chemfig` LaTeX code for the structure, provide it within ` \\`\\`\\`chem ... \\`\\`\\` ` blocks. If the structure is too complex to represent accurately with `chemfig` or if you are unsure, describe it textually in detail instead of attempting `chemfig` code. Examples of `chemfig`:\\\\n- Methane: `\\\\chemfig{C(-[2]H)(-[4]H)(-[6]H)-[8]H}`\\\\n- Benzene: `\\\\chemfig{*6(=-=--=)}`\\\\nIf the image shows a circuit diagram, describe it within a ` \\`\\`\\`circuit ... \\`\\`\\` ` block.\\\\nExplain any chemical concepts or processes depicted. If the image is part of a problem, try to guide the user towards solving it as a tutor would.";
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-pro",
       contents: createUserContent([
         createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
         prompt
@@ -88,7 +88,7 @@ async function processGroupedFilesWithGemini(files: File[]) {
       })
     );
 
-    const prompt = "Analyze the following files as a single group. For PDF documents, provide a comprehensive summary. For images, describe the content and extract any visible text. Combine all findings into a single, coherent response, clearly indicating which finding pertains to which file if necessary.";
+    const prompt = "Analyze the following files as a single related group and create a cohesive summary using Markdown formatting. Use standard Markdown structure (headers with #, lists, emphasis, etc). For mathematical expressions, use LaTeX notation: $...$ for inline math and $$...$$ for display equations. For chemical formulas, use $\\ce{H2O}$ notation. For complex chemical structures or reactions, represent them in ```chem blocks with proper chemical notation, like: ```chem\\nR-OH + R'-COOH -> R'-COOR + H2O\\n```. If analyzing circuits, represent them using ```circuit [diagram description] ``` blocks. Create a well-structured, comprehensive summary that clearly relates information from all the files, with special attention to properly formatting any chemical or mathematical content.";
 
     const response = await ai.models.generateContent({
       model: "gemini-1.5-flash-latest", // Using a model that's good with multi-file context
