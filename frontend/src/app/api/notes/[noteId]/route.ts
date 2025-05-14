@@ -176,11 +176,11 @@ export async function DELETE(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { noteId: string } }
+  { params }: { params: Promise<{ noteId: string }> }
 ) {
   try {
     const { userId } = await auth();
-    const { noteId } = params;
+    const { noteId } = await params;
     const { title, content } = await request.json();
 
     if (!userId) {
