@@ -4,8 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { ClerkProvider } from "@clerk/nextjs";
-import { NotesProvider } from "@/contexts/NotesContext";
-
+import ClientLayout from "@/components/ClientLayout";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,6 +19,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SuperchargedNotes",
   description: "Transform your study materials into powerful learning tools",
+  openGraph: {
+    images: ['/og-image.png'],
+  },
 };
 
 export default function RootLayout({
@@ -32,16 +34,16 @@ export default function RootLayout({
       <html lang="en">
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <Navbar />
-        <main className="min-h-screen">
-          <NotesProvider>
-            {children}
-          </NotesProvider>
-        </main>
-        <Footer />
-      </body>
-    </html>
+        >
+          <ClientLayout>
+            <Navbar />
+            <main className="min-h-screen">
+              {children}
+            </main>
+            <Footer />
+          </ClientLayout>
+        </body>
+      </html>
     </ClerkProvider>
   );
 }
