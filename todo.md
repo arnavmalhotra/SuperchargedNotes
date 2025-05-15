@@ -1,31 +1,34 @@
+**To-Do List**
 
+* **Prompting for better results and accuracy**
 
+* **Diagrams & Circuits**
 
-PROMPTING - forever 
+  * Build/choose diagram editor for circuit sketches
+  * Integrate rendering output into note-conversion pipeline
 
+* **Rendering Engine**
 
-FIGURE OUT DIAGRAMS AND CIRCUITS
+  * Add LaTeX + Markdown support for flashcards and quizzes
+  * Ensure equations, lists, and tables render consistently across web & mobile
 
-LATEX + MARKDOWN RENDERING FOR FLASHCARDS AND QUIZZES
-EXPORT FUNCTIONALITY FOR FLASHCARDS AND QUIZZES
+* **Flashcards & Quizzes**
 
+  * Enable export to / import from Anki & Quizlet
+  * Provide pre-creation customization UI (card style, question type, tags)
+  * Build one-click PDF / Markdown export function
 
+* **Mobile UX**
 
+  * Audit responsive layouts; optimize touch targets and font scaling
+  * Test on iOS Safari & Android Chrome
 
+* **UI Polishing**
 
+  * Replace all HTTP pop-ups with shadcn/ui dialogs
+  * Make every dashboard card fully clickable (no dead zones)
 
-edit all 3 things. MANUALLY CREATE ALL 3 THINGS
+* **Realtime Experience**
 
-
-MOBILE FRIENDLY
-
-
-replace all http popups with shadcn dialogs
-
-
-automatic refresh upon changes
-
-make all the cards in the dashboard clickable
-
-
-THEN WE'RE READY TO LAUNCH
+  * Implement automatic refresh when notes or study items change
+  * Add toast notification for successful auto-save

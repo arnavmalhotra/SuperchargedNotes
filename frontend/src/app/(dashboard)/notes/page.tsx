@@ -259,19 +259,6 @@ export default function NotesPage() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem 
-                        onSelect={(e) => handleCreateFlashcards(e as unknown as React.MouseEvent, note.id)}
-                        disabled={isCreatingFlashcards[note.id]}
-                      >
-                        {isCreatingFlashcards[note.id] ? 'Creating...' : 'Create Flashcards'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onSelect={(e) => handleCreateQuiz(e as unknown as React.MouseEvent, note.id)}
-                        disabled={isCreatingQuiz[note.id]}
-                      >
-                        {isCreatingQuiz[note.id] ? 'Creating...' : 'Create Quizzes'}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
                         onSelect={(e) => handleDeleteNote(e as unknown as React.MouseEvent, note.id)}
                         className="text-red-600 hover:!text-red-600 hover:!bg-red-50"
                       >
@@ -289,7 +276,33 @@ export default function NotesPage() {
                 )}
               </CardHeader>
               <CardContent>
-                <p className="text-gray-600 line-clamp-3">{note.content}</p>
+                <p className="text-gray-600 line-clamp-3 mb-4">{note.content}</p>
+                <div className="flex gap-2 mt-3">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="flex-grow text-xs py-1 text-blue-600 border-blue-300 hover:bg-blue-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCreateFlashcards(e, note.id);
+                    }}
+                    disabled={isCreatingFlashcards[note.id]}
+                  >
+                    {isCreatingFlashcards[note.id] ? 'Creating...' : 'Create Flashcards'}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="flex-grow text-xs py-1 text-purple-600 border-purple-300 hover:bg-purple-50" 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCreateQuiz(e, note.id);
+                    }}
+                    disabled={isCreatingQuiz[note.id]}
+                  >
+                    {isCreatingQuiz[note.id] ? 'Creating...' : 'Create Quiz'}
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

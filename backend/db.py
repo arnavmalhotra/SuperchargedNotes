@@ -2,6 +2,9 @@ from fastapi import HTTPException, Header
 from supabase import create_client, Client
 import os
 from typing import Optional
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Supabase setup
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "YOUR_SUPABASE_URL")

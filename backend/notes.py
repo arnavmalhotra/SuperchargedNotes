@@ -1,8 +1,21 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Header, Response
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import os
 from db import supabase, get_current_user_id
+import json
+from datetime import datetime
+import markdown2
+from mdx_math import MathExtension
+import latex2mathml.converter
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+import io
+import re
 
 # Create router for notes endpoints
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -262,4 +275,142 @@ async def create_note(request: NoteUpdateRequest, user_id: str = Depends(get_cur
         raise http_exc
     except Exception as e:
         print(f"Error in POST /api/notes: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to create note: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to create note: {str(e)}")
+
+@router.post("/{note_id}/export-pdf")
+async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(None)):
+    if not x_user_id:
+        raise HTTPException(status_code=401, detail="User ID is required")
+
+    try:
+        # Fetch the note
+        response = supabase.from_('notes').select('*').eq('id', note_id).eq('user_id', x_user_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Note not found")
+        
+        note = response.data[0]
+        
+        # Custom LaTeX handler for markdown2
+        def latex_to_mathml(latex_str):
+            try:
+                return latex2mathml.converter.convert(latex_str)
+            except Exception as e:
+                print(f"Error converting LaTeX to MathML: {e}")
+                return latex_str  # Return original string if conversion fails
+        
+        # Convert markdown to HTML with LaTeX support
+        extras = {
+            'fenced-code-blocks': None,
+            'tables': None,
+            'break-on-newline': None,
+            'code-friendly': None,
+            'strike': None,
+            'task_list': None,
+            'latex': {
+                'convert': latex_to_mathml,
+            },
+            'math': {
+                'convert': latex_to_mathml,
+            }
+        }
+        
+        html_content = markdown2.markdown(note['content'], extras=extras)
+        
+        # Create PDF buffer
+        buffer = io.BytesIO()
+        
+        # Create the PDF document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=2*cm,
+            leftMargin=2*cm,
+            topMargin=2*cm,
+            bottomMargin=2*cm
+        )
+        
+        # Get the default style sheet and create custom styles
+        styles = getSampleStyleSheet()
+        
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Title'],
+            fontSize=24,
+            spaceAfter=30,
+            textColor=colors.black
+        )
+        
+        metadata_style = ParagraphStyle(
+            'Metadata',
+            parent=styles['Normal'],
+            fontSize=9,
+            textColor=colors.gray,
+            spaceAfter=20
+        )
+        
+        code_style = ParagraphStyle(
+            'Code',
+            parent=styles['Code'],
+            fontSize=10,
+            fontName='Courier',
+            backColor=colors.lightgrey,
+            borderPadding=5
+        )
+        
+        # Story (content elements)
+        story = []
+        
+        # Add title
+        story.append(Paragraph(note['title'], title_style))
+        
+        # Add metadata
+        metadata = f"Created: {datetime.fromisoformat(note['created_at']).strftime('%B %d, %Y')} | Last updated: {datetime.fromisoformat(note['updated_at']).strftime('%B %d, %Y')}"
+        story.append(Paragraph(metadata, metadata_style))
+        
+        # Process HTML content into ReportLab elements
+        # Split content by code blocks first
+        parts = re.split(r'(<pre><code>.*?</code></pre>)', html_content, flags=re.DOTALL)
+        
+        for part in parts:
+            if part.startswith('<pre><code>'):
+                # Handle code blocks
+                code = part[11:-13].strip()  # Remove <pre><code> and </code></pre>
+                story.append(Paragraph(code, code_style))
+                story.append(Spacer(1, 12))
+            else:
+                # Handle regular content
+                # Split by double newlines to create paragraphs
+                paragraphs = part.split('\n\n')
+                for p in paragraphs:
+                    if p.strip():
+                        # Handle task lists
+                        if p.startswith('<li class="task-list-item">'):
+                            p = p.replace('<li class="task-list-item">', '☐ ').replace('</li>', '')
+                        # Handle other HTML elements
+                        p = p.replace('<strong>', '<b>').replace('</strong>', '</b>')
+                        p = p.replace('<em>', '<i>').replace('</em>', '</i>')
+                        p = p.replace('<del>', '<strike>').replace('</del>', '</strike>')
+                        story.append(Paragraph(p, styles['Normal']))
+                        story.append(Spacer(1, 12))
+        
+        # Build the PDF
+        doc.build(story)
+        
+        # Get the value of the BytesIO buffer
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        # Return the PDF
+        return Response(
+            content=pdf_content,
+            media_type='application/pdf',
+            headers={
+                'Content-Disposition': f'attachment; filename="{note["title"].replace(" ", "_")}.pdf"'
+            }
+        )
+        
+    except Exception as e:
+        print(f"Error generating PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to generate PDF") 

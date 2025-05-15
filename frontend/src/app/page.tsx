@@ -27,7 +27,6 @@ export default function Home() {
         <Features />
         <HowItWorks />
         <StudyMaterials />
-        <Showcase />
         <CallToAction />
       </main>
     </>

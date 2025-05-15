@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Edit2, Save, Download, FilePlus } from 'lucide-react';
+import { ArrowLeft, Edit2, Save, Download, FilePlus, Layers, BrainCircuit } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -57,6 +57,10 @@ export default function NoteDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
+  const [isCreatingFlashcards, setIsCreatingFlashcards] = useState(false);
+  const [flashcardCreationError, setFlashcardCreationError] = useState<string | null>(null);
+  const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
+  const [quizCreationError, setQuizCreationError] = useState<string | null>(null);
   
   // Custom components for ReactMarkdown
   const components = {
@@ -174,50 +178,115 @@ export default function NoteDetailPage() {
   };
 
   const handleExportToPdf = async () => {
-    if (!contentRef.current) return;
-    
+    if (!note || !user?.id) return;
     setIsPdfExporting(true);
-    
+
     try {
-      const element = contentRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+
+      const response = await fetch(`${apiBaseUrl}/api/notes/${noteId}/export-pdf`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': user.id,
+        },
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Get the PDF blob from the response
+      const blob = await response.blob();
       
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-      });
+      // Create a download link and trigger it
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'note'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
       
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 30;
-      
-      pdf.setFontSize(18);
-      pdf.text(note?.title || 'Note', pdfWidth / 2, 15, { align: 'center' });
-      
-      pdf.addImage(
-        imgData, 
-        'JPEG', 
-        imgX, 
-        imgY, 
-        imgWidth * ratio, 
-        imgHeight * ratio
-      );
-      
-      pdf.save(`${note?.title || 'note'}.pdf`);
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (err) {
       console.error("Error exporting to PDF:", err);
-      alert('Failed to export to PDF');
+      alert('Failed to export to PDF. Please try again.');
     } finally {
       setIsPdfExporting(false);
+    }
+  };
+
+  const handleCreateFlashcards = async () => {
+    if (!user?.id || !noteId) return;
+    setIsCreatingFlashcards(true);
+    setFlashcardCreationError(null);
+
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/flashcards/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': user.id,
+        },
+        body: JSON.stringify({ noteId, userId: user.id }), 
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create flashcards');
+      }
+
+      router.push(`/flashcards/${data.flashcardSet.id}`);
+    } catch (err) {
+      console.error(`Error creating flashcards:`, err);
+      setFlashcardCreationError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setIsCreatingFlashcards(false);
+    }
+  };
+
+  const handleCreateQuiz = async () => {
+    if (!user?.id || !noteId) return;
+    setIsCreatingQuiz(true);
+    setQuizCreationError(null);
+    
+    try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/quizzes/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': user.id,
+        },
+        body: JSON.stringify({
+          noteId,
+          userId: user.id,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create quiz');
+      }
+      
+      router.push(`/quizzes/${data.quiz.id}`);
+    } catch (err) {
+      console.error(`Error creating quiz:`, err);
+      setQuizCreationError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setIsCreatingQuiz(false);
     }
   };
 
@@ -281,9 +350,28 @@ export default function NoteDetailPage() {
             variant="outline" 
             onClick={handleExportToPdf}
             disabled={isPdfExporting || isEditing}
+            className="text-gray-700"
           >
             <Download className="h-4 w-4 mr-2" /> 
             {isPdfExporting ? 'Exporting...' : 'Export PDF'}
+          </Button>
+          <Button
+            variant="default"
+            className="bg-green-600 hover:bg-green-700 text-white"
+            onClick={handleCreateFlashcards}
+            disabled={isCreatingFlashcards || isEditing}
+          >
+            <Layers className="h-4 w-4 mr-2" />
+            {isCreatingFlashcards ? 'Creating...' : 'Flashcards'}
+          </Button>
+          <Button
+            variant="default"
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+            onClick={handleCreateQuiz}
+            disabled={isCreatingQuiz || isEditing}
+          >
+            <BrainCircuit className="h-4 w-4 mr-2" />
+            {isCreatingQuiz ? 'Creating...' : 'Quiz'}
           </Button>
           <Button 
             variant={isEditing ? "default" : "outline"} 
@@ -308,6 +396,18 @@ export default function NoteDetailPage() {
           )}
         </div>
       </div>
+      
+      {flashcardCreationError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <p>Error creating flashcards: {flashcardCreationError}</p>
+        </div>
+      )}
+      
+      {quizCreationError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+          <p>Error creating quiz: {quizCreationError}</p>
+        </div>
+      )}
       
       {saveError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">

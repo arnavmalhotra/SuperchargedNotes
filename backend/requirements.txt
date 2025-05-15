@@ -1,6 +1,10 @@
 fastapi
-uvicorn[standard]
+uvicorn
 supabase
 google-genai
 python-multipart
 openai
+reportlab
+markdown2
+python-markdown-math
+latex2mathml

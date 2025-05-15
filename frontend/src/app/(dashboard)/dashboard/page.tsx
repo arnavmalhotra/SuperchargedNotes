@@ -301,13 +301,13 @@ export default function DashboardPage() {
                 <Card key={file.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-2">
                     <div className="flex flex-row items-start justify-between">
-                      <div>
+                      <Link href={`/notes/${file.id}`} className="flex-grow cursor-pointer">
                         <CardTitle className="text-lg font-medium">{file.title}</CardTitle>
                         <div className="flex items-center text-sm text-gray-500 mt-1">
                           <Calendar className="h-4 w-4 mr-1.5" />
                           {new Date(file.created_at).toLocaleDateString()}
                         </div>
-                      </div>
+                      </Link>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
@@ -315,19 +315,6 @@ export default function DashboardPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem 
-                            onSelect={() => handleCreateFlashcards(file.id)}
-                            disabled={isCreatingFlashcards[file.id]}
-                          >
-                            {isCreatingFlashcards[file.id] ? 'Creating...' : 'Create Flashcards'}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onSelect={() => handleCreateQuiz(file.id)}
-                            disabled={isCreatingQuiz[file.id]}
-                          >
-                            {isCreatingQuiz[file.id] ? 'Creating...' : 'Create Quizzes'}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           <DropdownMenuItem 
                             onSelect={() => handleDeleteNoteOnDashboard(file.id)}
                             className="text-red-600 hover:!text-red-600 hover:!bg-red-50"
@@ -346,7 +333,29 @@ export default function DashboardPage() {
                     )}
                   </CardHeader>
                   <CardContent>
-                    <p className="text-gray-600 line-clamp-2">{file.content || ''}</p>
+                    <Link href={`/notes/${file.id}`} className="cursor-pointer">
+                      <p className="text-gray-600 line-clamp-2 mb-3">{file.content || ''}</p>
+                    </Link>
+                    <div className="flex gap-2 mt-3">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="flex-grow text-xs py-1 text-blue-600 border-blue-300 hover:bg-blue-50"
+                        onClick={() => handleCreateFlashcards(file.id)} 
+                        disabled={isCreatingFlashcards[file.id]}
+                      >
+                        {isCreatingFlashcards[file.id] ? 'Creating...' : 'Create Flashcards'}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-grow text-xs py-1 text-purple-600 border-purple-300 hover:bg-purple-50" 
+                        onClick={() => handleCreateQuiz(file.id)}
+                        disabled={isCreatingQuiz[file.id]}
+                      >
+                        {isCreatingQuiz[file.id] ? 'Creating...' : 'Create Quiz'}
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               ))
