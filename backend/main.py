@@ -22,7 +22,7 @@ app = FastAPI()
 # CORS Middleware Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
+    allow_origins=["http://localhost:3000", "https://superchargednotes.com", "https://supercharged-notes.vercel.app"],  # Allow all origins
     allow_credentials=True, # Allows cookies to be included in requests
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
