@@ -16,7 +16,6 @@
 
   * Enable export to / import from Anki & Quizlet
   * Provide pre-creation customization UI (card style, question type, tags)
-  * Build one-click PDF / Markdown export function
 
 * **Mobile UX**
 
