@@ -45,18 +45,34 @@ export default function DashboardPage() {
   });
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
   const [isCreatingFlashcards, setIsCreatingFlashcards] = useState<Record<string, boolean>>({});
   const [flashcardCreationError, setFlashcardCreationError] = useState<Record<string, string | null>>({});
   const [isCreatingQuiz, setIsCreatingQuiz] = useState<Record<string, boolean>>({});
-  const [quizCreationError, setQuizCreationError] = useState<Record<string, string | null>>({});
+  const [error, setError] = useState<Record<string, string | null>>({});
 
   const fetchDashboardStats = async () => {
+    if (!user?.id) {
+      console.log("User not available yet for fetching stats.");
+      return;
+    }
     setLoading(true);
     try {
-      const response = await fetch('/api/dashboard/stats');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      const response = await fetch(`${apiBaseUrl}/api/dashboard/stats`, {
+        method: 'GET',
+        headers: {
+          'X-User-Id': user.id,
+        }
+      });
       const data = await response.json();
       if (data.success) {
         setStats(data.stats);
+      } else {
+        console.error('Error fetching dashboard stats:', data.message || 'Unknown error from backend');
       }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -66,8 +82,10 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchDashboardStats();
-  }, []);
+    if (user?.id) {
+      fetchDashboardStats();
+    }
+  }, [user]);
 
   const handleCreateFlashcards = async (fileId: string) => {
     if (!user?.id) {
@@ -80,10 +98,16 @@ export default function DashboardPage() {
     setFlashcardCreationError(prev => ({ ...prev, [fileId]: null }));
 
     try {
-      const response = await fetch('/api/flashcards/create', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/flashcards/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': user.id,
         },
         body: JSON.stringify({ noteId: fileId, userId: user.id }), 
       });
@@ -107,35 +131,43 @@ export default function DashboardPage() {
 
   const handleCreateQuiz = async (fileId: string) => {
     if (!user?.id) {
-      console.error("User not authenticated");
-      setQuizCreationError(prev => ({ ...prev, [fileId]: "User not authenticated" }));
+      console.error("User ID not found");
       return;
     }
-
+    
     setIsCreatingQuiz(prev => ({ ...prev, [fileId]: true }));
-    setQuizCreationError(prev => ({ ...prev, [fileId]: null }));
-
+    setError(prev => ({ ...prev, [fileId]: null }));
+    
     try {
-      const response = await fetch('/api/quizzes/create', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/quizzes/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': user.id,
         },
-        body: JSON.stringify({ noteId: fileId, userId: user.id }),
+        body: JSON.stringify({
+          noteId: fileId,
+          userId: user.id,
+        }),
       });
-
+      
       const data = await response.json();
-
+      
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to create quiz');
       }
-
-      console.log('Quiz created successfully for file:', data.quizSet);
+      
+      console.log('Quiz created successfully');
+      // Refresh dashboard data
       fetchDashboardStats();
-
+      
     } catch (err) {
       console.error(`Error creating quiz for file ${fileId}:`, err);
-      setQuizCreationError(prev => ({ ...prev, [fileId]: err instanceof Error ? err.message : 'An unknown error occurred' }));
+      setError(prev => ({
+        ...prev,
+        [fileId]: err instanceof Error ? err.message : 'An unknown error occurred'
+      }));
     } finally {
       setIsCreatingQuiz(prev => ({ ...prev, [fileId]: false }));
     }
@@ -146,8 +178,12 @@ export default function DashboardPage() {
       return;
     }
     try {
-      const response = await fetch(`/api/notes/${noteId}`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/notes/${noteId}`, {
         method: 'DELETE',
+        headers: {
+          'X-User-Id': user?.id || '',
+        }
       });
       const data = await response.json();
       if (!response.ok || !data.success) {
@@ -305,8 +341,8 @@ export default function DashboardPage() {
                     {flashcardCreationError[file.id] && (
                       <p className="text-xs text-red-500 mt-1">Error creating flashcards: {flashcardCreationError[file.id]}</p>
                     )}
-                    {quizCreationError[file.id] && (
-                      <p className="text-xs text-red-500 mt-1">Error creating quiz: {quizCreationError[file.id]}</p>
+                    {error[file.id] && (
+                      <p className="text-xs text-red-500 mt-1">Error creating quiz: {error[file.id]}</p>
                     )}
                   </CardHeader>
                   <CardContent>

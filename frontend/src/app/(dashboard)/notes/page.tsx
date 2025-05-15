@@ -30,10 +30,26 @@ export default function NotesPage() {
   const [quizCreationError, setQuizCreationError] = useState<Record<string, string | null>>({});
 
   const fetchNotes = async () => {
+    if (!user?.id) {
+      setError("User not authenticated");
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/notes');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/notes`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      });
+      
       const data = await response.json();
 
       if (!data.success) {
@@ -49,8 +65,10 @@ export default function NotesPage() {
   };
 
   useEffect(() => {
-    fetchNotes();
-  }, []);
+    if (user?.id) {
+      fetchNotes();
+    }
+  }, [user]);
 
   const handleOpenNote = (noteId: string) => {
     router.push(`/notes/${noteId}`);
@@ -63,9 +81,18 @@ export default function NotesPage() {
     }
 
     try {
-      const response = await fetch(`/api/notes/${noteId}`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/notes/${noteId}`, {
         method: 'DELETE',
+        headers: {
+          'X-User-Id': user?.id || '',
+        }
       });
+      
       const data = await response.json();
 
       if (!response.ok || !data.success) {
@@ -75,6 +102,7 @@ export default function NotesPage() {
       fetchNotes(); 
       // Optionally, you might want to show a success toast/notification here
       alert(data.message || 'Note deleted successfully');
+      router.push('/notes');
 
     } catch (err) {
       console.error(`Error deleting note ${noteId}:`, err);
@@ -95,10 +123,12 @@ export default function NotesPage() {
     setFlashcardCreationError(prev => ({ ...prev, [noteId]: null }));
 
     try {
-      const response = await fetch('/api/flashcards/create', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/flashcards/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': user.id,
         },
         body: JSON.stringify({ noteId, userId: user.id }), 
       });
@@ -133,10 +163,12 @@ export default function NotesPage() {
     setQuizCreationError(prev => ({ ...prev, [noteId]: null }));
 
     try {
-      const response = await fetch('/api/quizzes/create', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/quizzes/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': user.id,
         },
         body: JSON.stringify({ noteId, userId: user.id }),
       });

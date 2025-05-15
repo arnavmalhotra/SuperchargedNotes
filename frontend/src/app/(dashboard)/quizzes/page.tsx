@@ -49,7 +49,12 @@ export default function QuizzesPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/quizzes/list');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/quizzes/list`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      });
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to fetch quiz sets');
@@ -96,8 +101,12 @@ export default function QuizzesPage() {
       return;
     }
     try {
-      const response = await fetch(`/api/quizzes/${quizId}`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/quizzes/${quizId}`, {
         method: 'DELETE',
+        headers: {
+          'X-User-Id': user.id,
+        }
       });
       const data = await response.json();
       if (!response.ok || !data.success) {

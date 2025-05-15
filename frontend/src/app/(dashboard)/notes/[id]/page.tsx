@@ -85,7 +85,17 @@ export default function NoteDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/notes/${noteId}`);
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/notes/${noteId}`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      });
+      
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to fetch note');
@@ -129,10 +139,16 @@ export default function NoteDetailPage() {
     setSaveError(null);
     
     try {
-      const response = await fetch(`/api/notes/${noteId}`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/notes/${noteId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': user.id,
         },
         body: JSON.stringify({
           title: editedTitle,

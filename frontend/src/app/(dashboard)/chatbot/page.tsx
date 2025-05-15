@@ -7,6 +7,9 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeSanitize from 'rehype-sanitize';
+import Link from 'next/link';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUser } from '@clerk/nextjs';
 
 // Custom renderer components
 const ChemBlock = ({ children }: { children: string }) => (
@@ -50,6 +53,7 @@ interface ContextDocument {
 // ];
 
 export default function ChatbotPage() {
+  const { user } = useUser();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -83,7 +87,12 @@ export default function ChatbotPage() {
       setIsLoadingDocuments(true);
       setDocumentError(null);
       try {
-        const response = await fetch('/api/me/documents');
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+        const response = await fetch(`${apiBaseUrl}/api/me/documents`, {
+          headers: {
+            'X-User-Id': user?.id || '',
+          }
+        });
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to fetch documents');
@@ -104,7 +113,7 @@ export default function ChatbotPage() {
     };
 
     fetchDocuments();
-  }, []);
+  }, [user?.id]); // Add user?.id as a dependency to refetch when user changes
 
   // Handle input change for @mention and document selection
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -231,10 +240,12 @@ export default function ChatbotPage() {
         payload.contextDocument = selectedContextDocument;
       }
 
-      const response = await fetch('/api/chatbot', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/chatbot`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-User-Id': user?.id || '',
         },
         body: JSON.stringify(payload),
       });

@@ -35,7 +35,17 @@ export default function FlashcardsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/flashcards/list'); 
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/flashcards/list`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      });
+      
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to fetch flashcard sets');
@@ -65,9 +75,18 @@ export default function FlashcardsPage() {
       return;
     }
     try {
-      const response = await fetch(`/api/flashcards/${setId}`, {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/flashcards/${setId}`, {
         method: 'DELETE',
+        headers: {
+          'X-User-Id': user?.id || '',
+        }
       });
+      
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to delete flashcard set');

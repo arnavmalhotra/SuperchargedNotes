@@ -2,6 +2,7 @@ import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } fro
 import { FileText, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { NotesProvider } from '@/contexts/NotesContext';
+import { useUser } from '@clerk/nextjs';
 
 interface Note {
   id: string;
@@ -12,16 +13,33 @@ interface Note {
 }
 
 export const Notes = forwardRef((props, ref) => {
+  const { user } = useUser();
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchNotes = useCallback(async () => {
+    if (!user?.id) {
+      setError("User not authenticated");
+      setIsLoading(false);
+      return;
+    }
+    
     try {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/notes');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/notes`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      });
+      
       const data = await response.json();
 
       if (!response.ok) {
@@ -35,7 +53,7 @@ export const Notes = forwardRef((props, ref) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useImperativeHandle(ref, () => ({
     fetchNotes

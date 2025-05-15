@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useNotes } from '@/contexts/NotesContext';
+import { useUser } from '@clerk/nextjs';
 
 interface UploadModalProps {
   onUploadSuccess?: () => void;
@@ -46,6 +47,7 @@ export function UploadModal({ onUploadSuccess }: UploadModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const { refreshNotes } = useNotes();
+  const { user } = useUser();
 
   const resetState = () => {
     setFiles([]);
@@ -82,8 +84,12 @@ export function UploadModal({ onUploadSuccess }: UploadModalProps) {
       });
       formData.append('groupFiles', groupFiles.toString());
 
-      const response = await fetch('/api/upload', {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      const response = await fetch(`${apiBaseUrl}/api/upload`, {
         method: 'POST',
+        headers: {
+          'X-User-Id': user?.id || '',
+        },
         body: formData,
       });
 

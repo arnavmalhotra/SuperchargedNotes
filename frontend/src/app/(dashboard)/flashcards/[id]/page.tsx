@@ -40,7 +40,17 @@ export default function FlashcardDetail() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`/api/flashcards/${flashcardSetId}`);
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (!apiBaseUrl) {
+        throw new Error("API base URL is not configured.");
+      }
+      
+      const response = await fetch(`${apiBaseUrl}/api/flashcards/${flashcardSetId}`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      });
+      
       const data = await response.json();
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to fetch flashcard set');

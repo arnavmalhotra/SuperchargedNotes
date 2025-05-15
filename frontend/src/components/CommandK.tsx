@@ -12,6 +12,7 @@ import {
   CommandSeparator,
 } from '@/components/ui/command'
 import { FileIcon, BookOpenIcon, BrainCircuitIcon, LayersIcon, SearchIcon } from 'lucide-react'
+import { useUser } from '@clerk/nextjs'
 
 type Note = {
   id: string
@@ -39,6 +40,7 @@ type FlashcardSet = {
 
 export function CommandK() {
   const router = useRouter()
+  const { user } = useUser()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
@@ -48,10 +50,18 @@ export function CommandK() {
 
   // Function to fetch all user content
   const fetchContent = async () => {
+    if (!user?.id) return;
+    
     setLoading(true)
     try {
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+      
       // Fetch notes
-      const notesResponse = await fetch('/api/notes')
+      const notesResponse = await fetch(`${apiBaseUrl}/api/notes`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      })
       if (notesResponse.ok) {
         const notesData = await notesResponse.json()
         if (notesData.success && notesData.notes) {
@@ -60,7 +70,11 @@ export function CommandK() {
       }
 
       // Fetch quizzes
-      const quizzesResponse = await fetch('/api/quizzes/list')
+      const quizzesResponse = await fetch(`${apiBaseUrl}/api/quizzes/list`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      })
       if (quizzesResponse.ok) {
         const quizzesData = await quizzesResponse.json()
         if (quizzesData.success && quizzesData.quizSets) {
@@ -69,7 +83,11 @@ export function CommandK() {
       }
 
       // Fetch flashcards
-      const flashcardsResponse = await fetch('/api/flashcards/list')
+      const flashcardsResponse = await fetch(`${apiBaseUrl}/api/flashcards/list`, {
+        headers: {
+          'X-User-Id': user.id,
+        }
+      })
       if (flashcardsResponse.ok) {
         const flashcardsData = await flashcardsResponse.json()
         if (flashcardsData.success && flashcardsData.flashcardSets) {
@@ -84,10 +102,10 @@ export function CommandK() {
   }
 
   useEffect(() => {
-    if (open) {
+    if (open && user?.id) {
       fetchContent()
     }
-  }, [open])
+  }, [open, user?.id])
 
   // Handle keyboard shortcut
   useEffect(() => {
