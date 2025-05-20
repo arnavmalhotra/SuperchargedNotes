@@ -71,7 +71,7 @@ async def fetch_document_content(user_id: str, doc: ContextDocument) -> str:
             # For quizzes, fetch the questions
             questions_response = supabase.from_('quiz_questions')\
                 .select('*')\
-                .eq('quiz_set_id', doc.id)\
+                .eq('quiz_id', doc.id)\
                 .execute()
                 
             if not hasattr(questions_response, 'error') and questions_response.data:
@@ -92,7 +92,7 @@ async def fetch_document_content(user_id: str, doc: ContextDocument) -> str:
             # For flashcard sets, fetch the cards
             cards_response = supabase.from_('individual_flashcards')\
                 .select('*')\
-                .eq('flashcard_set_id', doc.id)\
+                .eq('id', doc.id)\
                 .execute()
                 
             if not hasattr(cards_response, 'error') and cards_response.data:
@@ -110,6 +110,8 @@ async def fetch_document_content(user_id: str, doc: ContextDocument) -> str:
     except Exception as e:
         print(f"Error fetching document content: {e}")
         return f"Error: Could not fetch document content: {str(e)}"
+
+
 
 @router.post("")
 async def chat(request: ChatRequest, user_id: str = Depends(get_current_user_id)):
