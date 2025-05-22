@@ -244,7 +244,7 @@ Text:
 ---
 
 Output format example:
-[{{"front": "Question 1", "back": "Answer 1"}}, {{"front": "Question 2", "back": "Answer 2"}}]"""
+[{"front": "Question 1", "back": "Answer 1"}, {"front": "Question 2", "back": "Answer 2"}]"""
 
         # Call Gemini API
         response = genai_client.models.generate_content(
