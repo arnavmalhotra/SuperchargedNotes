@@ -12,6 +12,7 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
+import 'katex/dist/contrib/mhchem';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import { Extension } from '@codemirror/state';
 
@@ -22,11 +23,18 @@ const CodeMirror = dynamic<ReactCodeMirrorProps>(() => import('@uiw/react-codemi
 });
 
 // Custom renderer components
-const ChemBlock = ({ children }: { children: string }) => (
-  <div className="chem-structure p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
-    <div className="text-gray-800 overflow-auto" dangerouslySetInnerHTML={{ __html: children }} />
-  </div>
-);
+const ChemBlock = ({ children }: { children: string }) => {
+  // Pre-process the chemical formulas to prepare them for KaTeX
+  const processedContent = children
+    .replace(/\\ce\{([^}]+)\}/g, (_, formula) => `$\\ce{${formula}}$`)
+    .replace(/\\chemfig\{([^}]+)\}/g, (_, formula) => `$\\chemfig{${formula}}$`);
+    
+  return (
+    <div className="chem-structure p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
+      <div className="text-gray-800 overflow-auto" dangerouslySetInnerHTML={{ __html: processedContent }} />
+    </div>
+  );
+};
 
 const CircuitBlock = ({ children }: { children: string }) => (
   <div className="circuit-diagram p-4 border border-gray-200 rounded-md bg-gray-50 my-4">

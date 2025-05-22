@@ -308,22 +308,39 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         
         note = response.data[0]
         
-        # Process the markdown content including math
+        # Process the markdown content with better handling for math and chemistry
+        # 1. First convert the markdown to HTML with MathExtension for basic LaTeX
         extensions = ["fenced_code", "tables", MathExtension(enable_dollar_delimiter=True)]
         html_content = markdown2.markdown(note['content'], extras=extensions)
         
-        # Process chemical formulas with proper handling
-        # Convert \ce{} commands for chemistry
-        def process_chem_formula(match):
-            formula = match.group(1)
-            # Process subscripts in chemical formulas
-            processed = re.sub(r'_(\d+)', r'<sub>\1</sub>', formula)
-            return f'<span class="chemical-formula">{processed}</span>'
+        # 2. Post-process the HTML to properly handle chemistry formulas
+        # Preserve LaTeX in the HTML for KaTeX to render on the client side
         
-        html_content = re.sub(r'\\ce\{([^}]+)\}', process_chem_formula, html_content)
+        # Make sure math delimiters are properly preserved
+        # Replace any processed math back to LaTeX form for KaTeX to render
+        soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Convert \chemfig{} commands 
-        html_content = re.sub(r'\\chemfig\{([^}]+)\}', r'<span class="chem-structure">\ce{\1}</span>', html_content)
+        # Process all math and chemistry elements
+        for math_tag in soup.find_all(class_='math'):
+            # Preserve the LaTeX content for KaTeX
+            if 'display' in math_tag.get('class', []):
+                # Display math
+                math_content = math_tag.string
+                math_tag.string = ''
+                math_tag['class'] = 'katex-display'
+                math_tag.string = f"$$${math_content}$$$"
+            else:
+                # Inline math
+                math_content = math_tag.string
+                math_tag.string = ''
+                math_tag['class'] = 'katex'
+                math_tag.string = f"${math_content}$"
+        
+        # Get the updated HTML
+        html_content = str(soup)
+        
+        # Final fixes: restore special LaTeX constructs that might have been escaped
+        html_content = html_content.replace("$$$", "$$")
         
         # Create full HTML document with KaTeX for PDF rendering
         full_html = f"""
@@ -334,6 +351,7 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
             <title>{note['title']}</title>
             <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
             <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js"></script>
             <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
                 onload="renderMathInElement(document.body, {{
                     delimiters: [
@@ -344,10 +362,7 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
                     ],
                     trust: true,
                     strict: false,
-                    throwOnError: false,
-                    macros: {{
-                        '\\\\ce': '\\\\text{{\\\\ce{#1}}}'
-                    }}
+                    throwOnError: false
                 }});">
             </script>
             <style>
