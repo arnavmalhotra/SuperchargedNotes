@@ -163,9 +163,13 @@ def get_openrouter_response(messages: List[Dict[str, str]], response_type: str) 
     
     # System message based on response type
     system_message = (
-        "You are an expert chemistry tutor. Provide detailed, in-depth answers with examples and thorough explanations."
+        "You are an expert tutor. Provide detailed, in-depth answers with examples and thorough explanations. "
+        "Use LaTeX notation for mathematical expressions (inline with $...$ and display with $$...$$) "
+        "and use \\ce{} notation for chemical equations and formulas (e.g., \\ce{H2SO4}, \\ce{2H2 + O2 -> 2H2O})."
         if response_type == "detailed" else
-        "You are a helpful assistant. Provide concise, to-the-point answers."
+        "You are an expert tutor. Provide detailed, in-depth answers with examples and thorough explanations. "
+        "Use LaTeX notation for mathematical expressions (inline with $...$ and display with $$...$$) "
+        "and use \\ce{} notation for chemical equations and formulas (e.g., \\ce{H2SO4}, \\ce{2H2 + O2 -> 2H2O})."
     )
     
     # Add system message to the beginning
@@ -190,9 +194,13 @@ async def stream_openrouter_response(messages: List[Dict[str, str]], response_ty
     
     # System message based on response type
     system_message = (
-        "You are an expert chemistry tutor. Provide detailed, in-depth answers with examples and thorough explanations."
+        "You are an expert tutor. Provide detailed, in-depth answers with examples and thorough explanations. "
+        "Use LaTeX notation for mathematical expressions (inline with $...$ and display with $$...$$) "
+        "and use \\ce{} notation for chemical equations and formulas (e.g., \\ce{H2SO4}, \\ce{2H2 + O2 -> 2H2O})."
         if response_type == "detailed" else
-        "You are a helpful assistant. Provide concise, to-the-point answers."
+        "You are an expert tutor. Provide detailed, in-depth answers with examples and thorough explanations.  "
+        "Use LaTeX notation for mathematical expressions (inline with $...$ and display with $$...$$) "
+        "and use \\ce{} notation for chemical equations and formulas (e.g., \\ce{H2SO4}, \\ce{2H2 + O2 -> 2H2O})."
     )
     
     # Add system message to the beginning

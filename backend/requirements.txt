@@ -9,7 +9,5 @@ markdown2
 python-markdown-math
 latex2mathml
 dotenv
+pypandoc
 weasyprint
-beautifulsoup4
-matplotlib
-Pillow

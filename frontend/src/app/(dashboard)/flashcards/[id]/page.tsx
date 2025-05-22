@@ -16,7 +16,8 @@ import rehypeRaw from 'rehype-raw';
 import rehypeStringify from 'rehype-stringify';
 import 'katex/dist/katex.min.css';
 import 'katex/dist/contrib/mhchem';
-
+import 'katex/contrib/mhchem'
+import 'katex'
 interface IndividualFlashcard {
   id: string;
   front: string;

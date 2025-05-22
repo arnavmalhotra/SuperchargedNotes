@@ -229,6 +229,15 @@ Difficulty guidelines:
 - Medium: More detailed explanations, intermediate concepts, and application-level questions
 - Hard: Complex details, advanced concepts, and questions requiring synthesis of multiple ideas
 
+Special formatting guidelines:
+1. Mathematical expressions: Use LaTeX notation
+   - Inline math: $E = mc^2$
+   - Display math: $$K_a = \\frac{{[H^+][A^-]}}{{[HA]}}$$
+
+2. Chemical equations and formulas: Use \\ce{} notation (will be rendered with mhchem)
+   - Example: \\ce{2H2 + O2 -> 2H2O}
+   - Example: \\ce{H2SO4}
+
 Text:
 ---
 {note_data['content']}
@@ -239,7 +248,7 @@ Output format example:
 
         # Call Gemini API
         response = genai_client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-1.5-pro",
             contents=prompt,
         )
 

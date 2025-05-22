@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, Loader2, Zap, BookOpen, FileText, Brain, FileQuestion, X } from 'lucide-react';
 import 'katex/dist/katex.min.css';
+import 'katex/dist/contrib/mhchem.min.js';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -10,6 +11,8 @@ import rehypeSanitize from 'rehype-sanitize';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUser } from '@clerk/nextjs';
+import 'katex'
+import 'katex/contrib/mhchem'
 
 // Custom renderer components
 const ChemBlock = ({ children }: { children: string }) => (
@@ -154,6 +157,12 @@ export default function ChatbotPage() {
     
     let remainingContent = content;
     let processedContent = '';
+    
+    // Preprocess chemical equations for better rendering
+    // This helps with \ce{} notation that might not be properly detected
+    remainingContent = remainingContent.replace(/\\ce\{([^}]+)\}/g, (match, formula) => {
+      return match; // Keep the original, we'll let KaTeX handle it now
+    });
     
     // Handle circuit diagrams with special syntax
     remainingContent = remainingContent.replace(/```circuit\n([\s\S]*?)```/g, (match, circuit) => {
@@ -397,7 +406,10 @@ export default function ChatbotPage() {
                                   output: 'html',
                                   throwOnError: false, 
                                   strict: false,
-                                  trust: true
+                                  trust: true,
+                                  macros: {
+                                    "\\ce": "\\ce"
+                                  }
                                 }], 
                                 rehypeSanitize
                               ]}
@@ -424,7 +436,10 @@ export default function ChatbotPage() {
                                 output: 'html',
                                 throwOnError: false, 
                                 strict: false,
-                                trust: true
+                                trust: true,
+                                macros: {
+                                  "\\ce": "\\ce"
+                                }
                               }], 
                               rehypeSanitize
                             ]}
@@ -587,6 +602,20 @@ export default function ChatbotPage() {
         
         .markdown-content .katex-display > .katex {
           font-size: 1.1em;
+        }
+        
+        /* Styles for chemical equations */
+        .markdown-content .katex .mord.text {
+          font-style: normal;
+        }
+        
+        .markdown-content .katex-math {
+          text-align: center;
+        }
+        
+        /* Improve chemical formula display */
+        .markdown-content .katex .mhchem {
+          font-size: 1em;
         }
         
         .circuit-diagram-placeholder,
