@@ -16,6 +16,13 @@ import 'katex/dist/contrib/mhchem';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import { Extension } from '@codemirror/state';
 import React from 'react';
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkRehype from "remark-rehype";
+import rehypeStringify from "rehype-stringify";
+import 'katex'
+import 'katex/contrib/mhchem'
+
 
 // Define KaTeX types
 declare global {
@@ -89,58 +96,43 @@ export default function NoteDetailPage() {
   const [flashcardCreationError, setFlashcardCreationError] = useState<string | null>(null);
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [quizCreationError, setQuizCreationError] = useState<string | null>(null);
-  
-  const components = {
-    code({ node, inline, className, children, ...props }: any) {
-      const match = /language-(\w+)/.exec(className || '');
-      const language = match ? match[1] : '';
-      
-      if (!inline && language === 'chem') {
-        return <ChemBlock>{String(children).replace(/\n$/, '')}</ChemBlock>;
-      }
-      
-      if (!inline && language === 'circuit') {
-        return <CircuitBlock>{String(children).replace(/\n$/, '')}</CircuitBlock>;
-      }
-      
-      return (
-        <code className={className} {...props}>
-          {children}
-        </code>
-      );
-    },
-    
-    // Add paragraph component for better spacing
-    p({ node, children, ...props }: any) {
-      return (
-        <p className="my-4" {...props}>
-          {children}
-        </p>
-      );
-    },
-    
-    // Add heading components for better styling
-    h1({ node, children, ...props }: any) {
-      return <h1 className="text-2xl font-bold mt-8 mb-4" {...props}>{children}</h1>;
-    },
-    h2({ node, children, ...props }: any) {
-      return <h2 className="text-xl font-bold mt-6 mb-3" {...props}>{children}</h2>;
-    },
-    h3({ node, children, ...props }: any) {
-      return <h3 className="text-lg font-bold mt-5 mb-2" {...props}>{children}</h3>;
-    },
-    
-    // Add list styling
-    ul({ node, children, ...props }: any) {
-      return <ul className="list-disc pl-8 my-4" {...props}>{children}</ul>;
-    },
-    ol({ node, children, ...props }: any) {
-      return <ol className="list-decimal pl-8 my-4" {...props}>{children}</ol>;
-    },
-    li({ node, children, ...props }: any) {
-      return <li className="my-1" {...props}>{children}</li>;
-    },
-  };
+  const [processedContent, setProcessedContent] = useState('');
+
+  // Process content using unified when note content changes
+  useEffect(() => {
+    if (!isEditing && note?.content) {
+      // Preprocess the content to properly handle chemical equations
+      const preprocessContent = (content: string) => {
+        return content
+          // Fix the \ce command by removing the backslash
+          .replace(/\\ce/g, '\\ce')
+          // Handle block chemical equations (those on their own line)
+          .replace(/^\s*\\ce\{([^}]+)\}\s*$/gm, '$$\\ce{$1}$$')
+          // Handle inline chemical equations that aren't already wrapped in $
+          .replace(/(?<!\$)\\ce\{([^}]+)\}(?!\$)/g, '$\\ce{$1}$')
+          // Clean up any double-wrapped equations
+          .replace(/\$\$\$\$/g, '$$')
+          .replace(/\$\$/g, '$');
+      };
+
+      const preprocessedContent = preprocessContent(note.content);
+
+      unified()
+        .use(remarkParse)
+        .use(remarkMath)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeRaw)
+        .use(rehypeKatex, { strict: false })
+        .use(rehypeStringify, { allowDangerousHtml: true })
+        .process(preprocessedContent)
+        .then((file) => {
+          setProcessedContent(String(file));
+        })
+        .catch((err) => {
+          console.error('Error processing content:', err);
+        });
+    }
+  }, [isEditing, note?.content]);
 
   const fetchNote = async () => {
     if (!user?.id || !noteId) return;
@@ -348,68 +340,6 @@ export default function NoteDetailPage() {
     }
   };
 
-  // Effect to ensure KaTeX processes all chemistry elements after render
-  useEffect(() => {
-    if (!isEditing && contentRef.current && typeof window !== 'undefined' && window.katex) {
-      // Find all chemistry elements and process them
-      const processChemElements = () => {
-        const chemElements = contentRef.current?.querySelectorAll('.chemistry-content');
-        if (chemElements && chemElements.length > 0) {
-          chemElements.forEach(element => {
-            // Attempt to render chemical formulas
-            try {
-              // Get the raw content
-              const content = element.textContent || '';
-              
-              // Replace chemical formulas with KaTeX rendered elements
-              const processedContent = content.replace(
-                /\\ce\{([^}]+)\}/g, 
-                (match, formula) => {
-                  try {
-                    const katexRendered = window.katex.renderToString(`\\ce{${formula}}`, {
-                      throwOnError: false,
-                      output: 'html'
-                    });
-                    return katexRendered;
-                  } catch (e) {
-                    console.error('Error rendering chemical formula:', e);
-                    return match;
-                  }
-                }
-              );
-              
-              // Set the processed content
-              element.innerHTML = processedContent;
-            } catch (e) {
-              console.error('Error processing chemistry element:', e);
-            }
-          });
-        }
-      };
-      
-      // Process chemistry elements after a small delay to ensure everything is rendered
-      setTimeout(processChemElements, 300);
-    }
-  }, [isEditing, note?.content]);
-
-  // Helper function to process chemistry in text
-  const processChemistryText = (text: string) => {
-    if (!text.includes('\\ce{') && !text.includes('\\chemfig{')) {
-      return text;
-    }
-    
-    // First ensure KaTeX mhchem extension is available
-    if (typeof window !== 'undefined' && window.katex) {
-      // Ensure mhchem extension is loaded
-      require('katex/dist/contrib/mhchem');
-    }
-    
-    // Wrap chemical equations in KaTeX delimiters
-    return text
-      .replace(/\\ce\{([^}]+)\}/g, (_, formula) => `$\\ce{${formula}}$`)
-      .replace(/\\chemfig\{([^}]+)\}/g, (_, formula) => `$\\chemfig{${formula}}$`);
-  };
-
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -537,7 +467,7 @@ export default function NoteDetailPage() {
       
       <div className="mt-6">
         <div className="text-sm text-gray-500 mb-2">
-          Last updated: {new Date(note.updated_at).toLocaleString()}
+          Last updated: {new Date(note?.updated_at || '').toLocaleString()}
         </div>
         
         {isEditing ? (
@@ -552,44 +482,71 @@ export default function NoteDetailPage() {
             />
             <div className="p-3 bg-gray-50 border-t">
               <p className="text-xs text-gray-500">
-                <strong>Markdown and Math Tips:</strong> 
-                Use standard Markdown for formatting. For equations, use $...$ for inline math and $$...$$ for display equations.
+                <strong>Chemistry Equations:</strong> 
+                Use {`\\ce{}`} for chemical equations (e.g. {`\\ce{H2O + H+ <=> H3O+}`})
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                For chemistry formulas, use <code>{'\\ce{H_2O}'}</code> for inline chemical equations.
+                <strong>Examples:</strong>
               </p>
-              <p className="text-xs text-gray-500 mt-1">
-                For chemical structures, you can use ChemFig with <code>{'\\chemfig{...}'}</code> syntax.
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                For circuit diagrams, use <code>{'```circuit'}</code> with your diagram content and end with <code>{'```'}</code>. 
-                For complex chemical structures, use <code>{'```chem'}</code> with your structure and end with <code>{'```'}</code>.
-              </p>
+              <ul className="text-xs text-gray-500 list-disc pl-4">
+                <li>Simple molecule: {`\\ce{H2O}`}</li>
+                <li>Reaction: {`\\ce{CH3CHO + H+ <=> [CH3CHOH]+ <=> CH2=CHOH + H+}`}</li>
+                <li>With states: {`\\ce{Fe^{2+}}`}, {`\\ce{H2O(l)}`}</li>
+              </ul>
             </div>
           </div>
         ) : (
           <div 
             ref={contentRef}
             className="prose prose-sm sm:prose lg:prose-lg max-w-none bg-white p-6 rounded-lg shadow-sm border markdown-content math-content"
-          >
-            <ReactMarkdown
-              remarkPlugins={[remarkMath]}
-              rehypePlugins={[rehypeKatex, rehypeRaw]}
-              components={components}
-            >
-              {processChemistryText(note.content)}
-            </ReactMarkdown>
-          </div>
+            dangerouslySetInnerHTML={{ __html: processedContent }}
+          />
         )}
       </div>
 
-      {/* Update custom styles for content */}
       <style jsx global>{`
         .markdown-content {
           line-height: 1.8;
           font-size: 1.1rem;
         }
         
+        /* KaTeX specific styles */
+        .katex {
+          font-size: 1.1em !important;
+        }
+        
+        .katex-display {
+          margin: 1.5em 0 !important;
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 0.5em 0;
+        }
+
+        /* Ensure chemical equations are properly aligned */
+        .katex .mord.text {
+          text-align: left;
+        }
+
+        .katex .mrel {
+          padding: 0 0.2em;
+        }
+
+        /* Ensure proper spacing for chemical equations */
+        .katex .mord.textord {
+          margin: 0 0.1em;
+        }
+
+        .katex .mspace {
+          margin: 0 0.1em;
+        }
+
+        /* Fix arrow alignment in chemical equations */
+        .katex .mrel.amsrm {
+          padding: 0 0.2em;
+          vertical-align: middle;
+        }
+
+        /* Basic markdown styles */
         .markdown-content p {
           margin-bottom: 1.5em;
         }
@@ -639,69 +596,7 @@ export default function NoteDetailPage() {
           background: transparent;
           padding: 0;
         }
-        
-        /* KaTeX specific styles */
-        .katex-display {
-          margin: 1.5em 0 !important;
-          overflow-x: auto;
-          overflow-y: hidden;
-          padding: 0.5em 0;
-        }
-        
-        .katex {
-          font-size: 1.1em !important;
-        }
-        
-        /* Ensure chemical formulas and math are properly styled */
-        .chem-structure, .circuit-diagram {
-          margin: 2em 0;
-          border-radius: 0.5rem;
-          background-color: #f8fafc;
-        }
-        
-        /* Add styling for chemistry content */
-        .chemistry-content {
-          display: block;
-          width: 100%;
-          overflow-x: auto;
-        }
-        
-        /* Style for blockquotes with chemistry */
-        blockquote .chemistry-content {
-          margin: 0.5em 0;
-        }
-        
-        /* Style for chemistry in lists */
-        li .chemistry-content {
-          display: inline-block;
-          width: auto;
-        }
 
-        /* Fix to ensure all chemistry formulas render */
-        .markdown-content .katex-mathml {
-          display: none;
-        }
-
-        /* Fix styling for chemistry equations */
-        .markdown-content .mhchem .mord {
-          display: inline-block;
-        }
-        
-        /* Better styling for chemical equations */
-        .markdown-content .mhchem .mord.cemord {
-          margin-right: 0.05em;
-        }
-        
-        /* Ensure proper alignment for subscripts in chemical formulas */
-        .markdown-content .mhchem .msupsub {
-          text-align: left;
-        }
-        
-        /* Ensure chemical arrows render properly */
-        .markdown-content .mhchem .mrel {
-          margin: 0 0.2em;
-        }
-        
         @media (max-width: 640px) {
           .markdown-content {
             font-size: 1rem;
