@@ -46,6 +46,7 @@ class FlashcardSetsResponse(BaseModel):
 class CreateFlashcardRequest(BaseModel):
     noteId: str
     userId: str
+    preferences: Optional[Dict[str, Any]] = None
 
 class FormattedFlashcard(BaseModel):
     front_text: str
@@ -210,10 +211,23 @@ async def create_flashcards(request: CreateFlashcardRequest, user_id: str = Depe
 
         note_data = note_response.data
 
-        # Create prompt for Gemini
-        prompt = f"""Based on the following text, generate a list of flashcards. Each flashcard should be a JSON object with a "front" (question, term, or concept) and a "back" (answer or definition).
+        # Process user preferences
+        preferences = request.preferences or {}
+        card_count = preferences.get('card_count', 10)  # Default to 10 cards
+        difficulty = preferences.get('difficulty', 'medium')  # Default to medium difficulty
+        focus_topic = preferences.get('focus_topic', '')  # Default to no specific focus
+        
+        # Create prompt for Gemini with preferences
+        prompt = f"""Based on the following text, generate a list of {card_count} flashcards at {difficulty} difficulty level. Each flashcard should be a JSON object with a "front" (question, term, or concept) and a "back" (answer or definition).
 
 IMPORTANT: Return ONLY the valid JSON array as plain text without any markdown formatting, code blocks, or annotations. Do not use markdown syntax like ```json or ```. The response should be parseable directly by JSON.parse().
+
+{f'Focus on the topic of "{focus_topic}" if present in the content.' if focus_topic else ''}
+
+Difficulty guidelines:
+- Easy: Simple definitions, basic concepts, and straightforward questions
+- Medium: More detailed explanations, intermediate concepts, and application-level questions
+- Hard: Complex details, advanced concepts, and questions requiring synthesis of multiple ideas
 
 Text:
 ---
@@ -246,6 +260,14 @@ Output format example:
                     possible_json = re.search(r"\[\s*\{[\s\S]*\}\s*\]", json_text)
                     if possible_json:
                         json_text = possible_json.group(0)
+            
+            # Fix LaTeX backslashes before parsing JSON
+            # Replace \\ with a temporary placeholder to preserve them
+            json_text = json_text.replace("\\\\", "##DOUBLE_BACKSLASH##")
+            # Handle single backslashes that aren't already escaped in JSON
+            json_text = re.sub(r'([^\\])\\([^\\/"bfnrt])', r'\1\\\\\2', json_text)
+            # Restore double backslashes
+            json_text = json_text.replace("##DOUBLE_BACKSLASH##", "\\\\\\\\")
             
             flashcards = json.loads(json_text)
         except Exception as parse_error:

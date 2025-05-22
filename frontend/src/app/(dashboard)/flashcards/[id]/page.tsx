@@ -7,6 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription }
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, ArrowLeftCircle, ArrowRightCircle, RotateCcw } from 'lucide-react';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkMath from 'remark-math';
+import remarkRehype from 'remark-rehype';
+import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
+import rehypeStringify from 'rehype-stringify';
+import 'katex/dist/katex.min.css';
+import 'katex/dist/contrib/mhchem';
 
 interface IndividualFlashcard {
   id: string;
@@ -34,6 +43,45 @@ export default function FlashcardDetail() {
   const [error, setError] = useState<string | null>(null);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [showingFront, setShowingFront] = useState(true);
+  const [renderedFront, setRenderedFront] = useState('');
+  const [renderedBack, setRenderedBack] = useState('');
+
+  // Function to preprocess and render content with LaTeX
+  const renderLatexContent = async (content: string): Promise<string> => {
+    // Preprocess content to properly handle chemical equations
+    const preprocessContent = (content: string) => {
+      return content
+        // Wrap inline chemical equations in math delimiters if they aren't already
+        .replace(/(?<!\$)\\ce\{([^}]+)\}(?!\$)/g, '$\\ce{$1}$');
+    };
+
+    const preprocessedContent = preprocessContent(content);
+
+    try {
+      const file = await unified()
+        .use(remarkParse)
+        .use(remarkMath)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeRaw)
+        .use(rehypeKatex, { strict: false })
+        .use(rehypeStringify, { allowDangerousHtml: true })
+        .process(preprocessedContent);
+        
+      return String(file);
+    } catch (err) {
+      console.error('Error rendering LaTeX content:', err);
+      return content; // Fallback to original content if rendering fails
+    }
+  };
+
+  // Render the current card content when it changes
+  useEffect(() => {
+    if (flashcardSet && flashcardSet.individual_flashcards.length > 0) {
+      const currentCard = flashcardSet.individual_flashcards[currentCardIndex];
+      renderLatexContent(currentCard.front).then(setRenderedFront);
+      renderLatexContent(currentCard.back).then(setRenderedBack);
+    }
+  }, [flashcardSet, currentCardIndex]);
 
   const fetchFlashcardSet = async () => {
     if (!user?.id || !flashcardSetId) return;
@@ -190,13 +238,16 @@ export default function FlashcardDetail() {
           onClick={handleFlipCard}
         >
           <CardContent className="flex items-center justify-center h-full p-6">
-            <div className="text-center">
+            <div className="text-center w-full">
               <p className="text-sm text-gray-500 uppercase mb-4">
                 {showingFront ? 'FRONT' : 'BACK'}
               </p>
-              <p className="text-xl">
-                {showingFront ? currentCard.front : currentCard.back}
-              </p>
+              <div 
+                className="text-xl prose max-w-none"
+                dangerouslySetInnerHTML={{ 
+                  __html: showingFront ? renderedFront : renderedBack 
+                }} 
+              />
               <p className="text-gray-400 text-sm mt-6 italic">Click to flip</p>
             </div>
           </CardContent>
@@ -208,14 +259,15 @@ export default function FlashcardDetail() {
             onClick={handlePreviousCard}
             disabled={currentCardIndex === 0}
           >
-            <ArrowLeftCircle className="mr-2 h-4 w-4" /> Previous
+            <ArrowLeftCircle className="h-4 w-4 mr-2" /> Previous
           </Button>
           
           <Button 
             variant="outline" 
             onClick={handleRestart}
+            disabled={currentCardIndex === 0 && showingFront}
           >
-            <RotateCcw className="mr-2 h-4 w-4" /> Restart
+            <RotateCcw className="h-4 w-4 mr-2" /> Restart
           </Button>
           
           <Button 
@@ -223,16 +275,22 @@ export default function FlashcardDetail() {
             onClick={handleNextCard}
             disabled={currentCardIndex === flashcardSet.individual_flashcards.length - 1}
           >
-            Next <ArrowRightCircle className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-        
-        <div className="mt-8 text-center">
-          <Button onClick={handleBackToList} variant="ghost">
-            Back to Flashcards
+            Next <ArrowRightCircle className="h-4 w-4 ml-2" />
           </Button>
         </div>
       </div>
+      
+      <style jsx global>{`
+        .katex {
+          font-size: 1.1em !important;
+        }
+        
+        .katex-display {
+          margin: 1em 0 !important;
+          overflow-x: auto;
+          overflow-y: hidden;
+        }
+      `}</style>
     </div>
   );
 } 

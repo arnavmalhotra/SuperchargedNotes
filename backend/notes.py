@@ -20,10 +20,6 @@ import base64
 from weasyprint import HTML, CSS
 import tempfile
 from bs4 import BeautifulSoup
-import matplotlib.pyplot as plt
-from matplotlib import mathtext
-from PIL import Image as PILImage
-import requests  # Add this import for KaTeX API
 
 # Create router for notes endpoints
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -311,9 +307,10 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         
         # Pre-process content to handle chemical equations
         content = note['content']
+        
         # Convert chemical equations to LaTeX format that MathML can handle
-        content = re.sub(r'\\ce\{([^}]+)\}', r'$\\ce{\1}$', content)
-        content = re.sub(r'\\chemfig\{([^}]+)\}', r'$\\chemfig{\1}$', content)
+        # Wrap inline chemical equations in math delimiters
+        content = re.sub(r'(?<!\$)\\ce\{([^}]+)\}(?!\$)', r'$\\ce{\1}$', content)
         
         # Process the markdown content with better handling for math and chemistry
         # 1. First convert the markdown to HTML with MathExtension for basic LaTeX
@@ -323,33 +320,15 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         # 2. Create a BeautifulSoup object to manipulate the HTML
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # 3. Pre-render LaTeX math expressions using latex2mathml
+        # 3. Process all math tags including chemical equations
         for math_tag in soup.find_all(class_='math'):
             try:
+                # Get the LaTeX content and check if it's display or inline
                 latex_content = math_tag.string.strip()
                 is_display = 'display' in math_tag.get('class', [])
                 
-                # Handle chemistry notation in LaTeX
-                if '\\ce{' in latex_content or '\\chemfig{' in latex_content:
-                    # For chemistry, we'll use a different approach - create an image
-                    try:
-                        # Use requests to get rendered image from KaTeX API
-                        encoded_latex = base64.b64encode(latex_content.encode('utf-8')).decode('utf-8')
-                        img_tag = soup.new_tag('img')
-                        img_tag['alt'] = latex_content
-                        img_tag['src'] = f"data:image/svg+xml;base64,{encoded_latex}"
-                        img_tag['class'] = 'chemistry-formula'
-                        if is_display:
-                            img_tag['style'] = 'display: block; margin: 1em auto;'
-                        else:
-                            img_tag['style'] = 'display: inline-block; vertical-align: middle;'
-                        math_tag.replace_with(img_tag)
-                        continue
-                    except Exception as e:
-                        print(f"Error creating chemistry image: {e}")
-                        # Fall back to regular MathML conversion
-                
                 # Convert LaTeX to MathML using latex2mathml
+                # The latex2mathml library has built-in support for mhchem
                 mathml = latex2mathml.converter.convert(latex_content)
                 
                 # Replace the original tag with the MathML
@@ -423,23 +402,18 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
                 math {{
                     font-size: 1.1em;
                 }}
-                /* Chemistry-specific styles */
-                .chemistry-formula {{
+                /* Styling for chemical equations */
+                .math-display math,
+                .math-inline math {{
                     max-width: 100%;
                 }}
-                .chem-structure {{
-                    margin: 1em 0;
-                    padding: 1em;
-                    background-color: #f8f9fa;
-                    border-radius: 4px;
+                /* Improve rendering of chemical arrows and bonds */
+                math .mrow {{
+                    display: inline-block;
+                    vertical-align: middle;
                 }}
-                /* Better rendering for chemical formulas */
-                .cemord {{
-                    margin-right: 0.05em;
-                }}
-                /* Ensure proper alignment for subscripts */
-                .msupsub {{
-                    text-align: left;
+                math .mo {{
+                    padding: 0 0.2em;
                 }}
             </style>
         </head>
@@ -458,39 +432,44 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         
         # Create a temporary file to save the PDF
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+            tmp_path = tmp.name
+            
+        try:
+            # Generate PDF using WeasyPrint
+            HTML(string=full_html).write_pdf(
+                tmp_path, 
+                stylesheets=[
+                    CSS(string="""
+                        @page { 
+                            size: A4; 
+                            margin: 2cm;
+                        }
+                        math {
+                            font-size: 1.1em;
+                        }
+                        /* Improve rendering of chemical equations */
+                        math .mrow {
+                            display: inline-block;
+                            vertical-align: middle;
+                        }
+                        math .mo {
+                            padding: 0 0.2em;
+                        }
+                    """)
+                ]
+            )
+            
+            # Read the PDF file
+            with open(tmp_path, 'rb') as pdf_file:
+                pdf_bytes = pdf_file.read()
+        finally:
+            # Clean up - make sure to handle errors if file is in use
             try:
-                # Generate PDF using WeasyPrint
-                HTML(string=full_html).write_pdf(
-                    tmp.name, 
-                    stylesheets=[
-                        CSS(string="""
-                            @page { 
-                                size: A4; 
-                                margin: 2cm;
-                            }
-                            math {
-                                font-size: 1.1em;
-                            }
-                            /* Chemistry-specific styles */
-                            .chemistry-formula {
-                                max-width: 100%;
-                            }
-                            .chem-structure {
-                                margin: 1em 0;
-                                padding: 1em;
-                                background-color: #f8f9fa;
-                                border-radius: 4px;
-                            }
-                        """)
-                    ]
-                )
-                
-                # Read the PDF file
-                with open(tmp.name, 'rb') as pdf_file:
-                    pdf_bytes = pdf_file.read()
-            finally:
-                # Clean up
-                os.unlink(tmp.name)
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+            except Exception as e:
+                print(f"Warning: Could not delete temporary file {tmp_path}: {e}")
+                # This is non-fatal, so we continue
         
         # Return the PDF
         return Response(

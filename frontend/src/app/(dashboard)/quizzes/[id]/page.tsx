@@ -10,6 +10,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkMath from 'remark-math';
+import remarkRehype from 'remark-rehype';
+import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
+import rehypeStringify from 'rehype-stringify';
+import 'katex/dist/katex.min.css';
+import 'katex/dist/contrib/mhchem';
 
 interface QuizQuestion {
   id: string;
@@ -21,6 +30,12 @@ interface QuizQuestion {
   correct_option: 'A' | 'B' | 'C' | 'D';
   explanation: string;
   created_at: string;
+  rendered_question?: string;
+  rendered_option_a?: string;
+  rendered_option_b?: string;
+  rendered_option_c?: string;
+  rendered_option_d?: string;
+  rendered_explanation?: string;
 }
 
 interface QuizSet {
@@ -43,6 +58,54 @@ export default function QuizDetail() {
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
   const [showResults, setShowResults] = useState(false);
 
+  const renderLatexContent = async (content: string): Promise<string> => {
+    const preprocessContent = (content: string) => {
+      return content
+        .replace(/(?<!\$)\\ce\{([^}]+)\}(?!\$)/g, '$\\ce{$1}$');
+    };
+
+    const preprocessedContent = preprocessContent(content);
+
+    try {
+      const file = await unified()
+        .use(remarkParse)
+        .use(remarkMath)
+        .use(remarkRehype, { allowDangerousHtml: true })
+        .use(rehypeRaw)
+        .use(rehypeKatex, { strict: false })
+        .use(rehypeStringify, { allowDangerousHtml: true })
+        .process(preprocessedContent);
+        
+      return String(file);
+    } catch (err) {
+      console.error('Error rendering LaTeX content:', err);
+      return content;
+    }
+  };
+
+  const processQuizQuestions = async (questions: QuizQuestion[]): Promise<QuizQuestion[]> => {
+    return Promise.all(
+      questions.map(async (q) => {
+        const rendered_question = await renderLatexContent(q.question_text);
+        const rendered_option_a = await renderLatexContent(q.option_a);
+        const rendered_option_b = await renderLatexContent(q.option_b);
+        const rendered_option_c = await renderLatexContent(q.option_c);
+        const rendered_option_d = await renderLatexContent(q.option_d);
+        const rendered_explanation = await renderLatexContent(q.explanation);
+        
+        return {
+          ...q,
+          rendered_question,
+          rendered_option_a,
+          rendered_option_b,
+          rendered_option_c,
+          rendered_option_d,
+          rendered_explanation
+        };
+      })
+    );
+  };
+
   const fetchQuiz = async () => {
     if (!user?.id || !quizId) return;
     setLoading(true);
@@ -58,7 +121,17 @@ export default function QuizDetail() {
       if (!response.ok || !data.success) {
         throw new Error(data.message || 'Failed to fetch quiz');
       }
-      setQuiz(data.quiz || null);
+      
+      if (data.quiz) {
+        const processedQuestions = await processQuizQuestions(data.quiz.quiz_questions);
+        const processedQuiz = {
+          ...data.quiz,
+          quiz_questions: processedQuestions
+        };
+        setQuiz(processedQuiz);
+      } else {
+        setQuiz(null);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred while fetching the quiz.');
       console.error("Error fetching quiz:", err);
@@ -198,59 +271,118 @@ export default function QuizDetail() {
             <CardHeader>
               <CardTitle className="text-lg font-semibold flex items-start gap-2">
                 <span className="inline-block min-w-6">Q{index + 1}.</span>
-                <span className="flex-1">{question.question_text}</span>
+                <div 
+                  className="prose"
+                  dangerouslySetInnerHTML={{ 
+                    __html: question.rendered_question || question.question_text 
+                  }}
+                />
               </CardTitle>
             </CardHeader>
-            <CardContent className="pb-2">
+            <CardContent>
               <RadioGroup
                 value={userAnswers[question.id] || ''}
                 onValueChange={(value) => handleAnswerSelect(question.id, value)}
                 disabled={showResults}
-                className="space-y-3"
               >
-                {['A', 'B', 'C', 'D'].map((option) => {
-                  const optionText = question[`option_${option.toLowerCase()}` as keyof QuizQuestion] as string;
-                  const isSelected = userAnswers[question.id] === option;
-                  const isCorrect = question.correct_option === option;
+                <div className="space-y-3">
+                  <div className="flex items-start">
+                    <RadioGroupItem value="A" id={`q${question.id}-a`} className="mt-1" />
+                    <Label
+                      htmlFor={`q${question.id}-a`}
+                      className={`ml-3 flex-1 ${showResults && question.correct_option === 'A' ? 'text-green-600 font-medium' : ''}`}
+                    >
+                      <div 
+                        className="prose"
+                        dangerouslySetInnerHTML={{ 
+                          __html: question.rendered_option_a || question.option_a 
+                        }}
+                      />
+                    </Label>
+                    {showResults && question.correct_option === 'A' && (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 ml-1" />
+                    )}
+                  </div>
                   
-                  // Styles for showing correct/incorrect after submission
-                  let optionClassName = "flex items-start space-x-2 border p-3 rounded-md";
-                  if (showResults) {
-                    if (isCorrect) {
-                      optionClassName += " bg-green-50 border-green-200";
-                    } else if (isSelected && !isCorrect) {
-                      optionClassName += " bg-red-50 border-red-200";
-                    }
-                  } else if (isSelected) {
-                    optionClassName += " bg-blue-50 border-blue-200";
-                  } else {
-                    optionClassName += " hover:bg-gray-50";
-                  }
+                  <div className="flex items-start">
+                    <RadioGroupItem value="B" id={`q${question.id}-b`} className="mt-1" />
+                    <Label
+                      htmlFor={`q${question.id}-b`}
+                      className={`ml-3 flex-1 ${showResults && question.correct_option === 'B' ? 'text-green-600 font-medium' : ''}`}
+                    >
+                      <div 
+                        className="prose"
+                        dangerouslySetInnerHTML={{ 
+                          __html: question.rendered_option_b || question.option_b 
+                        }}
+                      />
+                    </Label>
+                    {showResults && question.correct_option === 'B' && (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 ml-1" />
+                    )}
+                  </div>
                   
-                  return (
-                    <div key={option} className={optionClassName}>
-                      <RadioGroupItem value={option} id={`${question.id}-${option}`} className="mt-1" />
-                      <div className="flex-1">
-                        <Label htmlFor={`${question.id}-${option}`} className="flex items-start cursor-pointer">
-                          <span className="font-medium min-w-4">{option}.</span>
-                          <span className="ml-1">{optionText}</span>
-                          {showResults && isCorrect && (
-                            <CheckCircle2 className="h-4 w-4 text-green-500 ml-2 mt-1 flex-shrink-0" />
-                          )}
-                          {showResults && isSelected && !isCorrect && (
-                            <AlertCircle className="h-4 w-4 text-red-500 ml-2 mt-1 flex-shrink-0" />
-                          )}
-                        </Label>
-                      </div>
-                    </div>
-                  );
-                })}
+                  <div className="flex items-start">
+                    <RadioGroupItem value="C" id={`q${question.id}-c`} className="mt-1" />
+                    <Label
+                      htmlFor={`q${question.id}-c`}
+                      className={`ml-3 flex-1 ${showResults && question.correct_option === 'C' ? 'text-green-600 font-medium' : ''}`}
+                    >
+                      <div 
+                        className="prose"
+                        dangerouslySetInnerHTML={{ 
+                          __html: question.rendered_option_c || question.option_c 
+                        }}
+                      />
+                    </Label>
+                    {showResults && question.correct_option === 'C' && (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 ml-1" />
+                    )}
+                  </div>
+                  
+                  <div className="flex items-start">
+                    <RadioGroupItem value="D" id={`q${question.id}-d`} className="mt-1" />
+                    <Label
+                      htmlFor={`q${question.id}-d`}
+                      className={`ml-3 flex-1 ${showResults && question.correct_option === 'D' ? 'text-green-600 font-medium' : ''}`}
+                    >
+                      <div 
+                        className="prose"
+                        dangerouslySetInnerHTML={{ 
+                          __html: question.rendered_option_d || question.option_d 
+                        }}
+                      />
+                    </Label>
+                    {showResults && question.correct_option === 'D' && (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 ml-1" />
+                    )}
+                  </div>
+                </div>
               </RadioGroup>
               
               {showResults && (
-                <div className="mt-4 text-sm border-t pt-3 border-gray-100">
-                  <p className="font-semibold">Explanation:</p>
-                  <p className="text-gray-700">{question.explanation}</p>
+                <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                  <div className="flex items-start">
+                    <div className={`flex items-center ${userAnswers[question.id] === question.correct_option ? 'text-green-600' : 'text-red-600'}`}>
+                      {userAnswers[question.id] === question.correct_option ? (
+                        <CheckCircle2 className="h-5 w-5 mr-2" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 mr-2" />
+                      )}
+                      <p className="font-medium">
+                        {userAnswers[question.id] === question.correct_option ? 'Correct!' : `Incorrect. The correct answer is ${question.correct_option}.`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-sm font-medium text-gray-700">Explanation:</p>
+                    <div 
+                      className="text-sm text-gray-600 mt-1 prose"
+                      dangerouslySetInnerHTML={{ 
+                        __html: question.rendered_explanation || question.explanation 
+                      }}
+                    />
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -258,17 +390,29 @@ export default function QuizDetail() {
         ))}
       </div>
       
-      <div className="mt-8 flex justify-end">
-        {!showResults ? (
+      {!showResults && (
+        <div className="mt-6 flex justify-end">
           <Button onClick={handleSubmitQuiz} disabled={Object.keys(userAnswers).length < quiz.quiz_questions.length}>
-            Submit Answers
+            Submit Quiz
           </Button>
-        ) : (
-          <Button onClick={handleBackToList}>
-            Back to Quizzes
-          </Button>
-        )}
-      </div>
+        </div>
+      )}
+      
+      <style jsx global>{`
+        .katex {
+          font-size: 1.1em !important;
+        }
+        
+        .katex-display {
+          margin: 1em 0 !important;
+          overflow-x: auto;
+          overflow-y: hidden;
+        }
+        
+        .prose {
+          max-width: 100% !important;
+        }
+      `}</style>
     </div>
   );
 } 

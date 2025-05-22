@@ -22,6 +22,24 @@ import remarkRehype from "remark-rehype";
 import rehypeStringify from "rehype-stringify";
 import 'katex'
 import 'katex/contrib/mhchem'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 
 // Define KaTeX types
@@ -97,6 +115,20 @@ export default function NoteDetailPage() {
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [quizCreationError, setQuizCreationError] = useState<string | null>(null);
   const [processedContent, setProcessedContent] = useState('');
+  
+  // Preferences dialogs
+  const [showFlashcardPreferences, setShowFlashcardPreferences] = useState(false);
+  const [showQuizPreferences, setShowQuizPreferences] = useState(false);
+  
+  // Flashcard preferences
+  const [flashcardCount, setFlashcardCount] = useState(10);
+  const [flashcardDifficulty, setFlashcardDifficulty] = useState('medium');
+  const [flashcardFocusTopic, setFlashcardFocusTopic] = useState('');
+  
+  // Quiz preferences
+  const [quizQuestionCount, setQuizQuestionCount] = useState(5);
+  const [quizDifficulty, setQuizDifficulty] = useState('medium');
+  const [quizFocusTopic, setQuizFocusTopic] = useState('');
 
   // Process content using unified when note content changes
   useEffect(() => {
@@ -288,7 +320,15 @@ export default function NoteDetailPage() {
           'Content-Type': 'application/json',
           'X-User-Id': user.id,
         },
-        body: JSON.stringify({ noteId, userId: user.id }), 
+        body: JSON.stringify({ 
+          noteId, 
+          userId: user.id,
+          preferences: {
+            card_count: flashcardCount,
+            difficulty: flashcardDifficulty,
+            focus_topic: flashcardFocusTopic
+          }
+        }), 
       });
 
       const data = await response.json();
@@ -303,6 +343,7 @@ export default function NoteDetailPage() {
       setFlashcardCreationError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setIsCreatingFlashcards(false);
+      setShowFlashcardPreferences(false);  // Close the dialog
     }
   };
 
@@ -322,6 +363,11 @@ export default function NoteDetailPage() {
         body: JSON.stringify({
           noteId,
           userId: user.id,
+          preferences: {
+            question_count: quizQuestionCount,
+            difficulty: quizDifficulty,
+            focus_topic: quizFocusTopic
+          }
         }),
       });
       
@@ -337,6 +383,7 @@ export default function NoteDetailPage() {
       setQuizCreationError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setIsCreatingQuiz(false);
+      setShowQuizPreferences(false);  // Close the dialog
     }
   };
 
@@ -408,7 +455,7 @@ export default function NoteDetailPage() {
           <Button
             variant="default"
             className="bg-green-600 hover:bg-green-700 text-white"
-            onClick={handleCreateFlashcards}
+            onClick={() => setShowFlashcardPreferences(true)}
             disabled={isCreatingFlashcards || isEditing}
           >
             <Layers className="h-4 w-4 mr-2" />
@@ -417,7 +464,7 @@ export default function NoteDetailPage() {
           <Button
             variant="default"
             className="bg-purple-600 hover:bg-purple-700 text-white"
-            onClick={handleCreateQuiz}
+            onClick={() => setShowQuizPreferences(true)}
             disabled={isCreatingQuiz || isEditing}
           >
             <BrainCircuit className="h-4 w-4 mr-2" />
@@ -503,6 +550,146 @@ export default function NoteDetailPage() {
           />
         )}
       </div>
+
+      {/* Flashcard Preferences Dialog */}
+      <Dialog open={showFlashcardPreferences} onOpenChange={setShowFlashcardPreferences}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Flashcard Generation Options</DialogTitle>
+            <DialogDescription>
+              Customize how your flashcards are generated from this note.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="flashcard-count" className="text-right">
+                Number of Cards
+              </Label>
+              <Input
+                id="flashcard-count"
+                type="number"
+                min={5}
+                max={30}
+                value={flashcardCount}
+                onChange={(e) => setFlashcardCount(parseInt(e.target.value) || 10)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="flashcard-difficulty" className="text-right">
+                Difficulty
+              </Label>
+              <Select 
+                value={flashcardDifficulty} 
+                onValueChange={setFlashcardDifficulty}
+              >
+                <SelectTrigger id="flashcard-difficulty" className="col-span-3">
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Easy</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="flashcard-topic" className="text-right">
+                Focus Topic
+              </Label>
+              <Input
+                id="flashcard-topic"
+                placeholder="Optional topic to focus on"
+                value={flashcardFocusTopic}
+                onChange={(e) => setFlashcardFocusTopic(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFlashcardPreferences(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateFlashcards} 
+              disabled={isCreatingFlashcards}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isCreatingFlashcards ? 'Creating...' : 'Create Flashcards'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quiz Preferences Dialog */}
+      <Dialog open={showQuizPreferences} onOpenChange={setShowQuizPreferences}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Quiz Generation Options</DialogTitle>
+            <DialogDescription>
+              Customize how your quiz is generated from this note.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="quiz-count" className="text-right">
+                Number of Questions
+              </Label>
+              <Input
+                id="quiz-count"
+                type="number"
+                min={3}
+                max={20}
+                value={quizQuestionCount}
+                onChange={(e) => setQuizQuestionCount(parseInt(e.target.value) || 5)}
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="quiz-difficulty" className="text-right">
+                Difficulty
+              </Label>
+              <Select 
+                value={quizDifficulty} 
+                onValueChange={setQuizDifficulty}
+              >
+                <SelectTrigger id="quiz-difficulty" className="col-span-3">
+                  <SelectValue placeholder="Select difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Easy</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="quiz-topic" className="text-right">
+                Focus Topic
+              </Label>
+              <Input
+                id="quiz-topic"
+                placeholder="Optional topic to focus on"
+                value={quizFocusTopic}
+                onChange={(e) => setQuizFocusTopic(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQuizPreferences(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateQuiz} 
+              disabled={isCreatingQuiz}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+            >
+              {isCreatingQuiz ? 'Creating...' : 'Create Quiz'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <style jsx global>{`
         .markdown-content {

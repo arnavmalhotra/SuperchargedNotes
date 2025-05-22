@@ -49,6 +49,7 @@ class QuizSetsResponse(BaseModel):
 class CreateQuizRequest(BaseModel):
     noteId: str
     userId: str
+    preferences: Optional[Dict[str, Any]] = None  # Add preferences field
 
 # GET /api/quizzes/list - Get all quiz sets for a user
 @router.get("/list", response_model=QuizSetsResponse)
@@ -219,8 +220,14 @@ async def create_quiz(request: CreateQuizRequest, user_id: str = Depends(get_cur
 
         note_data = note_response.data
 
-        # Create prompt for Gemini
-        prompt = f"""Based on the following text, generate a multiple-choice quiz. Each question should be a JSON object with the following properties:
+        # Process user preferences
+        preferences = request.preferences or {}
+        question_count = preferences.get('question_count', 5)  # Default to 5 questions
+        difficulty = preferences.get('difficulty', 'medium')  # Default to medium difficulty
+        focus_topic = preferences.get('focus_topic', '')  # Default to no specific focus
+        
+        # Create prompt for Gemini with preferences
+        prompt = f"""Based on the following text, generate a multiple-choice quiz with {question_count} questions at {difficulty} difficulty level. Each question should be a JSON object with the following properties:
 - question_text: The question itself
 - option_a: First option
 - option_b: Second option
@@ -230,6 +237,13 @@ async def create_quiz(request: CreateQuizRequest, user_id: str = Depends(get_cur
 - explanation: Brief explanation of why the answer is correct
 
 IMPORTANT: Return ONLY the valid JSON array as plain text without any markdown formatting, code blocks, or annotations. Do not use markdown syntax like ```json or ```. The response should be parseable directly by JSON.parse().
+
+{f'Focus on the topic of "{focus_topic}" if present in the content.' if focus_topic else ''}
+
+Difficulty guidelines:
+- Easy: Simple recall questions with straightforward options
+- Medium: Application and comprehension questions with more nuanced options
+- Hard: Analysis and synthesis questions with challenging distractors
 
 Text:
 ---
@@ -262,6 +276,14 @@ Output format example:
                     possible_json = re.search(r"\[\s*\{[\s\S]*\}\s*\]", json_text)
                     if possible_json:
                         json_text = possible_json.group(0)
+            
+            # Fix LaTeX backslashes before parsing JSON
+            # Replace \\ with a temporary placeholder to preserve them
+            json_text = json_text.replace("\\\\", "##DOUBLE_BACKSLASH##")
+            # Handle single backslashes that aren't already escaped in JSON
+            json_text = re.sub(r'([^\\])\\([^\\/"bfnrt])', r'\1\\\\\2', json_text)
+            # Restore double backslashes
+            json_text = json_text.replace("##DOUBLE_BACKSLASH##", "\\\\\\\\")
             
             quiz_questions = json.loads(json_text)
         except Exception as parse_error:
