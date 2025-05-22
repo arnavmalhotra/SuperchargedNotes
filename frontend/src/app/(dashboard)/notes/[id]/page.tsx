@@ -25,9 +25,12 @@ declare global {
   interface Window {
     MathJax?: {
       typesetPromise?: () => Promise<any>;
+      typeset?: (elements?: any[]) => void;
       tex?: any;
+      svg?: any;
       loader?: any;
       startup?: any;
+      hub?: any;
     }
   }
 }
@@ -98,16 +101,16 @@ export default function NoteDetailPage() {
   // Process chemical formulas specifically
   const processChemicalFormulas = () => {
     if (contentRef.current) {
-      // Find all instances of \ce{...} and \chemfig{...} that aren't inside MathJax elements
-      const contentDiv = contentRef.current;
-      
-      // First, let MathJax handle its processing
+      // Let MathJax process the entire content
       setTimeout(() => {
-        // After MathJax has processed, find any unprocessed chemical formulas
-        if (typeof window !== 'undefined' && window.MathJax?.typesetPromise) {
-          window.MathJax.typesetPromise().then(() => {
-            // Additional processing could be added here if needed
-          });
+        if (typeof window !== 'undefined' && window.MathJax) {
+          try {
+            // Force MathJax to process all math in the content
+            window.MathJax.typeset?.(undefined);
+            window.MathJax.typesetPromise?.();
+          } catch (e) {
+            console.error("Error processing MathJax:", e);
+          }
         }
       }, 200);
     }
@@ -414,7 +417,7 @@ export default function NoteDetailPage() {
       <Script 
         id="mathjax-script"
         strategy="afterInteractive"
-        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"
         onLoad={() => {
           // Configure MathJax
           window.MathJax = {
@@ -422,17 +425,24 @@ export default function NoteDetailPage() {
               inlineMath: [['$', '$'], ['\\(', '\\)']],
               displayMath: [['$$', '$$'], ['\\[', '\\]']],
               processEscapes: true,
-              packages: {'[+]': ['mhchem', 'chemfig']}
+              packages: {'[+]': ['mhchem']}
+            },
+            svg: {
+              fontCache: 'global'
             },
             loader: {
-              load: ['[tex]/mhchem', '[tex]/chemfig']
+              load: ['[tex]/mhchem']
             },
             startup: {
               pageReady: () => {
-                return window.MathJax?.startup?.defaultPageReady?.() || Promise.resolve();
-              },
-              typeset: true,
-              enableMenu: false
+                const promise = window.MathJax?.startup?.defaultPageReady?.() || Promise.resolve();
+                return promise.then(() => {
+                  if (window.MathJax?.typeset) {
+                    // Process everything
+                    window.MathJax.typeset();
+                  }
+                });
+              }
             }
           };
         }}
@@ -560,7 +570,7 @@ export default function NoteDetailPage() {
         ) : (
           <div 
             ref={contentRef}
-            className="prose prose-sm sm:prose lg:prose-lg max-w-none bg-white p-6 rounded-lg shadow-sm border markdown-content"
+            className="prose prose-sm sm:prose lg:prose-lg max-w-none bg-white p-6 rounded-lg shadow-sm border markdown-content math-content"
           >
             <ReactMarkdown
               remarkPlugins={[remarkMath]}
@@ -656,6 +666,29 @@ export default function NoteDetailPage() {
         
         .markdown-content .MathJax {
           font-size: 1.2em;
+          margin: 0 0.15em;
+        }
+        
+        /* Fix display math spacing */
+        .markdown-content .MathJax_Display {
+          margin: 1em 0;
+        }
+        
+        /* Ensure chemical formulas are visible */
+        .markdown-content .mjx-chem {
+          display: inline-block;
+        }
+        
+        /* Improve CE and ChemFig visibility */
+        mjx-container[jax="SVG"] {
+          display: inline-block;
+          margin: auto;
+        }
+        
+        .markdown-content p mjx-container[jax="SVG"][display="true"] {
+          display: block;
+          text-align: center;
+          margin: 1em 0;
         }
         
         .chem-structure, .circuit-diagram {
