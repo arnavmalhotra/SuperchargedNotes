@@ -250,9 +250,9 @@ Special formatting guidelines:
    - Inline math: $E = mc^2$
    - Display math: $$K_a = \\frac{{[H^+][A^-]}}{{[HA]}}$$
 
-2. Chemical equations and formulas: Use \\ce{equation} notation (will be rendered with mhchem)
-   - Example: \\ce{2H2 + O2 -> 2H2O}
-   - Example: \\ce{H2SO4}
+2. Chemical equations and formulas: Use \\ce{{equation}} notation (will be rendered with mhchem)
+   - Example: \\ce{{2H2 + O2 -> 2H2O}}
+   - Example: \\ce{{H2SO4}}
 
 Text:
 ---
