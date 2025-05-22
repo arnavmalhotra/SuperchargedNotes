@@ -1,11 +1,7 @@
 **To-Do List**
 
-* **Prompting for better results and accuracy**
-
-* **Diagrams & Circuits**
-
-  * Build/choose diagram editor for circuit sketches
-  * Integrate rendering output into note-conversion pipeline
+PDF EXPORT IS BROKEN, ADD FLASHCARD EXPORT IN CSV FORM
+add rendering to chat, flashcards, quizzes - its done correctly in notes.
 
 * **Rendering Engine**
 
@@ -15,7 +11,6 @@
 * **Flashcards & Quizzes**
 
   * Enable export to / import from Anki & Quizlet
-  * Provide pre-creation customization UI (card style, question type, tags)
 
 * **Mobile UX**
 
