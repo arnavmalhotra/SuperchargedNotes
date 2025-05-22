@@ -218,7 +218,7 @@ async def create_flashcards(request: CreateFlashcardRequest, user_id: str = Depe
         focus_topic = preferences.get('focus_topic', '')  # Default to no specific focus
         
         # Create prompt for Gemini with preferences
-prompt = f"""Based on the following text, generate a list of {card_count} flashcards \
+        prompt = f"""Based on the following text, generate a list of {card_count} flashcards \
 at {difficulty} difficulty level. Each flashcard should be a JSON object with a \
 "front" (question, term, or concept) and a "back" (answer or definition).
 
