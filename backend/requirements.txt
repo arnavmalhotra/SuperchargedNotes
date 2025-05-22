@@ -8,6 +8,9 @@ reportlab
 markdown2
 python-markdown-math
 latex2mathml
-dotenv
+python-dotenv
 pypandoc
 weasyprint
+beautifulsoup4
+matplotlib
+pydantic
