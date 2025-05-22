@@ -221,19 +221,25 @@ async def update_note(note_id: str, request: NoteUpdateRequest, user_id: str = D
             .update(update_data)\
             .eq('id', note_id)\
             .eq('user_id', user_id)\
-            .select()\
-            .single()\
             .execute()
 
         update_error = getattr(note_update, 'error', None)
         if update_error:
             print(f"Error updating note: {update_error}")
             raise HTTPException(status_code=500, detail=f"Failed to update note: {update_error}")
+        
+        # Fetch the updated note
+        updated_note = supabase.from_('notes')\
+            .select('*')\
+            .eq('id', note_id)\
+            .eq('user_id', user_id)\
+            .single()\
+            .execute()
 
         return {
             "success": True,
             "message": "Note updated successfully",
-            "note": note_update.data
+            "note": updated_note.data
         }
 
     except HTTPException as http_exc:
