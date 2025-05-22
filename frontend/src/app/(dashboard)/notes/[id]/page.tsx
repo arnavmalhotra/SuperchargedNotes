@@ -263,94 +263,71 @@ export default function NoteDetailPage() {
     setIsPdfExporting(true);
 
     try {
-      // Client-side PDF generation using html2pdf.js
-      // This approach preserves the LaTeX rendering from the frontend
-      // @ts-ignore - Ignore TypeScript errors for html2pdf.js import
-      const html2pdfModule = await import('html2pdf.js');
-      // @ts-ignore - Use type assertion for html2pdf function
-      const html2pdf = html2pdfModule.default || html2pdfModule;
+      // Import the required libraries
+      const html2canvasModule = await import('html2canvas-pro');
+      const html2canvas = html2canvasModule.default;
+      const jsPDFModule = await import('jspdf');
+      const jsPDF = jsPDFModule.default;
       
-      // Clone the content element to avoid modifying the original
-      const element = contentRef.current.cloneNode(true) as HTMLElement;
-      
-      // Helper function to remove unsupported color formats from an element and its children
-      const processElement = (el: HTMLElement) => {
-        // Process the current element
-        if (el.style) {
-          // Replace any oklch colors with a fallback color
-          const styleProps = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
-          for (const prop of styleProps) {
-            const value = el.style[prop as any];
-            if (value && (value.includes('oklch') || value.includes('rgb('))) {
-              // Replace with a safe fallback color
-              el.style[prop as any] = prop === 'backgroundColor' ? '#f8f9fa' : '#333333';
-            }
-          }
-        }
-        
-        // Process all child elements recursively
-        Array.from(el.children).forEach(child => {
-          if (child instanceof HTMLElement) {
-            processElement(child);
-          }
-        });
-      };
-      
-      // Process the element to remove unsupported color formats
-      processElement(element);
-      
-      // Create a wrapper div for better formatting
-      const wrapper = document.createElement('div');
-      wrapper.style.padding = '40px';
-      wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      wrapper.style.color = '#333333'; // Set safe colors explicitly
-      wrapper.style.backgroundColor = '#ffffff';
+      // Create a temporary hidden div instead of cloning
+      const tempDiv = document.createElement('div');
+      tempDiv.style.visibility = 'hidden';
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.width = '210mm'; // A4 width
+      tempDiv.style.height = '297mm'; // A4 height
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '-9999px';
+      tempDiv.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      tempDiv.style.color = '#333333';
+      tempDiv.style.backgroundColor = '#ffffff';
+      tempDiv.style.padding = '40px';
       
       // Add title
       const titleEl = document.createElement('h1');
       titleEl.textContent = note.title;
       titleEl.style.fontSize = '24pt';
       titleEl.style.marginBottom = '20px';
-      titleEl.style.color = '#333333'; // Set safe colors explicitly
-      wrapper.appendChild(titleEl);
+      titleEl.style.color = '#333333';
+      tempDiv.appendChild(titleEl);
       
       // Add metadata
       const metaEl = document.createElement('div');
       metaEl.style.fontSize = '10pt';
-      metaEl.style.color = '#666666'; // Use hex color format for compatibility
+      metaEl.style.color = '#666666';
       metaEl.style.marginBottom = '30px';
       metaEl.innerHTML = `Created: ${new Date(note.created_at).toLocaleDateString()} | 
                           Last updated: ${new Date(note.updated_at || note.created_at).toLocaleDateString()}`;
-      wrapper.appendChild(metaEl);
+      tempDiv.appendChild(metaEl);
       
-      // Add the content
-      wrapper.appendChild(element);
+      // Copy the content from the original element
+      tempDiv.appendChild(contentRef.current.cloneNode(true));
       
-      // Set options for PDF generation
-      const options = {
-        margin: 15,
-        filename: `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'note'}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2,
-          useCORS: true,
-          letterRendering: true,
-          logging: false, // Disable logging
-          ignoreElements: (element: Element) => {
-            // Ignore elements with problematic styles that might cause issues
-            return element.classList?.contains('ignore-pdf');
-          }
-        },
-        jsPDF: { 
-          unit: 'mm', 
-          format: 'a4', 
-          orientation: 'portrait' 
-        }
-      };
+      // Add to document temporarily
+      document.body.appendChild(tempDiv);
       
-      // Generate and download PDF
-      // @ts-ignore - Ignore TypeScript errors for html2pdf function call
-      await html2pdf().from(wrapper).set(options).save();
+      // Generate PDF
+      const pdf = new jsPDF({
+        unit: 'mm',
+        format: 'a4',
+        orientation: 'portrait'
+      });
+      
+      // Capture the HTML content
+      const canvas = await html2canvas(tempDiv, {
+        scale: 2,
+        useCORS: true,
+        logging: false
+      });
+      
+      // Add the image to the PDF
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+      
+      // Save the PDF
+      pdf.save(`${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'note'}.pdf`);
+      
+      // Clean up - remove the temporary div
+      document.body.removeChild(tempDiv);
       
     } catch (err) {
       console.error("Error exporting to PDF:", err);
