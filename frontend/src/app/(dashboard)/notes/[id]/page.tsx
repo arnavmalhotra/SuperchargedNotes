@@ -11,9 +11,11 @@ import Script from 'next/script';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeSanitize from 'rehype-sanitize';
+import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
+import { Extension } from '@codemirror/state';
 
 // Dynamically import components to avoid SSR issues
-const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { 
+const CodeMirror = dynamic<ReactCodeMirrorProps>(() => import('@uiw/react-codemirror'), { 
   ssr: false,
   loading: () => <div className="h-[600px] bg-gray-100 animate-pulse rounded-md"></div>
 });
@@ -494,14 +496,14 @@ export default function NoteDetailPage() {
                 Use standard Markdown for formatting. For equations, use $...$ for inline math and $$...$$ for display equations.
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                For chemistry formulas, use <code>$\ce{H_2O}$</code> for inline or <code>$$\ce{H_2O}$$</code> for display formulas.
+                For chemistry formulas, use <code>{'$\\ce{H_2O}$'}</code> for inline or <code>{'$$\\ce{H_2O}$$'}</code> for display formulas.
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                For chemical structures, you can use ChemFig with <code>$\chemfig{...}$</code> syntax.
+                For chemical structures, you can use ChemFig with <code>{'$\\chemfig{...}$'}</code> syntax.
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                For circuit diagrams, use <code>```circuit</code> with your diagram content and end with <code>```</code>. 
-                For complex chemical structures, use <code>```chem</code> with your structure and end with <code>```</code>.
+                For circuit diagrams, use <code>{'```circuit'}</code> with your diagram content and end with <code>{'```'}</code>. 
+                For complex chemical structures, use <code>{'```chem'}</code> with your structure and end with <code>{'```'}</code>.
               </p>
             </div>
           </div>

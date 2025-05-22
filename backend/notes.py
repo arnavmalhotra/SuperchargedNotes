@@ -219,9 +219,9 @@ async def update_note(note_id: str, request: NoteUpdateRequest, user_id: str = D
         # Update the note
         note_update = supabase.from_('notes')\
             .update(update_data)\
-            .select()\
             .eq('id', note_id)\
             .eq('user_id', user_id)\
+            .select()\
             .single()\
             .execute()
 
