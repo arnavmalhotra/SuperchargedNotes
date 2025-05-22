@@ -17,8 +17,12 @@ from reportlab.lib.enums import TA_LEFT, TA_CENTER
 import io
 import re
 import base64
-from playwright.async_api import async_playwright
-import asyncio
+from weasyprint import HTML, CSS
+import tempfile
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+from matplotlib import mathtext
+from PIL import Image as PILImage
 
 # Create router for notes endpoints
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -303,133 +307,129 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
             raise HTTPException(status_code=404, detail="Note not found")
         
         note = response.data[0]
-
-        # Generate PDF using Playwright for better rendering of MathJax and chemistry formulas
-        async with async_playwright() as p:
-            browser = await p.chromium.launch()
-            page = await browser.new_page(viewport={"width": 1024, "height": 1400})
-            
-            # Prepare HTML content with MathJax
-            html_content = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>{note['title']}</title>
-                <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-                <script>
-                MathJax = {{
-                    tex: {{
-                        inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
-                        displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
-                        processEscapes: true,
-                        packages: {{'[+]': ['mhchem', 'chemfig']}}
-                    }},
-                    loader: {{
-                        load: ['[tex]/mhchem', '[tex]/chemfig']
-                    }},
-                    startup: {{
-                        pageReady: function() {{
-                            return MathJax.startup.defaultPageReady();
-                        }}
-                    }}
-                }};
-                </script>
-                <style>
-                    body {{
-                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-                        line-height: 1.6;
-                        padding: 2cm;
-                        max-width: 21cm;
-                        margin: 0 auto;
-                    }}
-                    h1 {{
-                        font-size: 24px;
-                        margin-bottom: 0.5em;
-                    }}
-                    .metadata {{
-                        font-size: 12px;
-                        color: #666;
-                        margin-bottom: 2em;
-                    }}
-                    pre {{
-                        background-color: #f5f5f5;
-                        padding: 1em;
-                        border-radius: 4px;
-                        overflow-x: auto;
-                    }}
-                    code {{
-                        font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
-                    }}
-                    .chem-structure, .circuit-diagram {{
-                        padding: 1em;
-                        border: 1px solid #eee;
-                        border-radius: 4px;
-                        background-color: #f9f9f9;
-                        margin: 1em 0;
-                    }}
-                    .mjx-chtml {{
-                        display: inline-block;
-                        line-height: 0;
-                        text-indent: 0;
-                        text-align: left;
-                        text-transform: none;
-                        font-style: normal;
-                        font-weight: normal;
-                        font-size: 100%;
-                        font-size-adjust: none;
-                        letter-spacing: normal;
-                        word-wrap: normal;
-                        direction: ltr;
-                        background: transparent;
-                    }}
-                    @media print {{
-                        body {{
-                            padding: 0;
-                        }}
-                    }}
-                </style>
-            </head>
-            <body>
-                <h1>{note['title']}</h1>
-                <div class="metadata">
-                    Created: {datetime.fromisoformat(note['created_at']).strftime('%B %d, %Y')} | 
-                    Last updated: {datetime.fromisoformat(note['updated_at']).strftime('%B %d, %Y')}
-                </div>
-                <div class="content">
-                    {note['content']}
-                </div>
-            </body>
-            </html>
-            """
-            
-            # Load the HTML content
-            await page.set_content(html_content)
-            
-            # Wait for MathJax to finish rendering
-            await page.wait_for_function("""
-                () => {
-                    return window.MathJax && 
-                           window.MathJax.startup && 
-                           window.MathJax.startup.promise && 
-                           window.MathJax.startup.promise.state() === 1;
-                }
-            """, timeout=10000)
-            
-            # Generate PDF
-            pdf_bytes = await page.pdf(format="A4", margin={"top": "1cm", "right": "1cm", "bottom": "1cm", "left": "1cm"})
-            
-            await browser.close()
-            
-            # Return the PDF
-            return Response(
-                content=pdf_bytes,
-                media_type="application/pdf",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{note["title"].replace(" ", "_")}.pdf"'
-                }
+        
+        # Process the markdown content including math
+        # Add the MathExtension for basic LaTeX rendering
+        extensions = ["fenced_code", "tables", MathExtension(enable_dollar_delimiter=True)]
+        html_content = markdown2.markdown(note['content'], extras=extensions)
+        
+        # Process LaTeX equations and chemical formulas
+        # This requires additional processing for complex equations
+        def process_latex(match):
+            latex = match.group(1)
+            try:
+                # Try to convert LaTeX to MathML for inline display
+                mathml = latex2mathml.converter.convert(latex)
+                return mathml
+            except:
+                # Fallback to just showing the LaTeX
+                return f"<span class='latex-error'>{latex}</span>"
+        
+        # Process inline math: $...$ or \(...\)
+        html_content = re.sub(r'\$([^$]+)\$', lambda m: process_latex(m), html_content)
+        html_content = re.sub(r'\\\(([^)]+)\\\)', lambda m: process_latex(m), html_content)
+        
+        # Process display math: $$...$$ or \[...\]
+        html_content = re.sub(r'\$\$([^$]+)\$\$', lambda m: f"<div class='math-display'>{process_latex(m)}</div>", html_content)
+        html_content = re.sub(r'\\\[([^\]]+)\\\]', lambda m: f"<div class='math-display'>{process_latex(m)}</div>", html_content)
+        
+        # For chemical equations using \ce{...}
+        def process_chem(match):
+            chem_formula = match.group(1)
+            # Handle basic chemical formulas with subscripts
+            processed = re.sub(r'(\d+)', r'<sub>\1</sub>', chem_formula)
+            return f"<span class='chem-formula'>{processed}</span>"
+        
+        html_content = re.sub(r'\\ce\{([^}]+)\}', lambda m: process_chem(m), html_content)
+        
+        # Create full HTML document
+        full_html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>{note['title']}</title>
+            <style>
+                @page {{ 
+                    size: A4; 
+                    margin: 2cm;
+                }}
+                body {{
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                    line-height: 1.6;
+                    font-size: 12pt;
+                    margin: 0;
+                    padding: 0;
+                }}
+                h1 {{
+                    font-size: 24pt;
+                    margin-bottom: 0.5em;
+                }}
+                .metadata {{
+                    font-size: 10pt;
+                    color: #666;
+                    margin-bottom: 2em;
+                }}
+                pre {{
+                    background-color: #f5f5f5;
+                    padding: 1em;
+                    border-radius: 4px;
+                    overflow-x: auto;
+                    white-space: pre-wrap;
+                }}
+                code {{
+                    font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+                }}
+                .chem-formula sub {{
+                    font-size: 0.8em;
+                }}
+                .math-display {{
+                    margin: 1em 0;
+                    text-align: center;
+                }}
+            </style>
+        </head>
+        <body>
+            <h1>{note['title']}</h1>
+            <div class="metadata">
+                Created: {datetime.fromisoformat(note['created_at']).strftime('%B %d, %Y')} | 
+                Last updated: {datetime.fromisoformat(note['updated_at']).strftime('%B %d, %Y')}
+            </div>
+            <div class="content">
+                {html_content}
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Create a temporary file to save the PDF
+        with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+            # Generate PDF using WeasyPrint
+            HTML(string=full_html).write_pdf(
+                tmp.name, 
+                stylesheets=[CSS(string="""
+                    @page { 
+                        size: A4; 
+                        margin: 2cm;
+                    }
+                """)]
             )
+            
+            # Read the PDF file
+            with open(tmp.name, 'rb') as pdf_file:
+                pdf_bytes = pdf_file.read()
+            
+            # Clean up
+            os.unlink(tmp.name)
+        
+        # Return the PDF
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{note["title"].replace(" ", "_")}.pdf"'
+            }
+        )
         
     except Exception as e:
         print(f"Error generating PDF: {str(e)}")

@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-supabase
+supabase>=2.15.1
 google-genai
 python-multipart
 openai
@@ -9,4 +9,7 @@ markdown2
 python-markdown-math
 latex2mathml
 dotenv
-playwright
+weasyprint
+beautifulsoup4
+matplotlib
+Pillow
