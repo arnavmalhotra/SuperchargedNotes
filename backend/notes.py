@@ -308,6 +308,11 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         
         note = response.data[0]
         
+        # Replace \chemfig{...} with \ce{...} for easier processing
+        content = note['content']
+        content = re.sub(r'\\chemfig\{([^}]+)\}', r'\\ce{\1}', content)
+        note['content'] = content
+        
         # Process the markdown content including math
         # Add the MathExtension for basic LaTeX rendering
         extensions = ["fenced_code", "tables", MathExtension(enable_dollar_delimiter=True)]

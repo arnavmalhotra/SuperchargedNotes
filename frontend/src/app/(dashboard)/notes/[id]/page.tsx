@@ -35,17 +35,13 @@ declare global {
 // Custom renderer components
 const ChemBlock = ({ children }: { children: string }) => (
   <div className="chem-structure p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
-    <div className="text-gray-800 overflow-auto">
-      {children}
-    </div>
+    <div className="text-gray-800 overflow-auto" dangerouslySetInnerHTML={{ __html: children }} />
   </div>
 );
 
 const CircuitBlock = ({ children }: { children: string }) => (
   <div className="circuit-diagram p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
-    <div className="text-gray-800 overflow-auto">
-      {children}
-    </div>
+    <div className="text-gray-800 overflow-auto" dangerouslySetInnerHTML={{ __html: children }} />
   </div>
 );
 
@@ -89,12 +85,33 @@ export default function NoteDetailPage() {
   // Update content after MathJax loads or content changes
   useEffect(() => {
     if (!isEditing && note?.content) {
+      // Process content specifically for chemical formulas
+      processChemicalFormulas();
+      
       // Schedule MathJax typesetting after component updates
       setTimeout(() => {
         initMathJax();
       }, 100);
     }
   }, [isEditing, note?.content]);
+
+  // Process chemical formulas specifically
+  const processChemicalFormulas = () => {
+    if (contentRef.current) {
+      // Find all instances of \ce{...} and \chemfig{...} that aren't inside MathJax elements
+      const contentDiv = contentRef.current;
+      
+      // First, let MathJax handle its processing
+      setTimeout(() => {
+        // After MathJax has processed, find any unprocessed chemical formulas
+        if (typeof window !== 'undefined' && window.MathJax?.typesetPromise) {
+          window.MathJax.typesetPromise().then(() => {
+            // Additional processing could be added here if needed
+          });
+        }
+      }, 200);
+    }
+  };
 
   // Custom components for ReactMarkdown
   const components = {
@@ -115,7 +132,38 @@ export default function NoteDetailPage() {
           {children}
         </code>
       );
-    }
+    },
+    
+    // Add paragraph component for better spacing
+    p({ node, children, ...props }: any) {
+      return (
+        <p className="my-4" {...props}>
+          {children}
+        </p>
+      );
+    },
+    
+    // Add heading components for better styling
+    h1({ node, children, ...props }: any) {
+      return <h1 className="text-2xl font-bold mt-8 mb-4" {...props}>{children}</h1>;
+    },
+    h2({ node, children, ...props }: any) {
+      return <h2 className="text-xl font-bold mt-6 mb-3" {...props}>{children}</h2>;
+    },
+    h3({ node, children, ...props }: any) {
+      return <h3 className="text-lg font-bold mt-5 mb-2" {...props}>{children}</h3>;
+    },
+    
+    // Add list styling
+    ul({ node, children, ...props }: any) {
+      return <ul className="list-disc pl-8 my-4" {...props}>{children}</ul>;
+    },
+    ol({ node, children, ...props }: any) {
+      return <ol className="list-decimal pl-8 my-4" {...props}>{children}</ol>;
+    },
+    li({ node, children, ...props }: any) {
+      return <li className="my-1" {...props}>{children}</li>;
+    },
   };
 
   const fetchNote = async () => {
@@ -381,8 +429,10 @@ export default function NoteDetailPage() {
             },
             startup: {
               pageReady: () => {
-                initMathJax();
-              }
+                return window.MathJax?.startup?.defaultPageReady?.() || Promise.resolve();
+              },
+              typeset: true,
+              enableMenu: false
             }
           };
         }}
@@ -525,11 +575,67 @@ export default function NoteDetailPage() {
 
       {/* Update custom styles for content */}
       <style jsx global>{`
-        .markdown-content .math-display {
+        .markdown-content {
+          line-height: 1.8;
+          font-size: 1.1rem;
+        }
+        
+        .markdown-content p {
+          margin-bottom: 1.5em;
+        }
+        
+        .markdown-content h1, 
+        .markdown-content h2, 
+        .markdown-content h3 {
+          margin-top: 1.5em;
+          margin-bottom: 0.75em;
+          line-height: 1.3;
+        }
+        
+        .markdown-content ul, 
+        .markdown-content ol {
+          margin-top: 0.75em;
+          margin-bottom: 0.75em;
+        }
+        
+        .markdown-content li {
+          margin-bottom: 0.5em;
+        }
+        
+        .markdown-content blockquote {
+          border-left: 4px solid #e2e8f0;
+          padding-left: 1em;
+          color: #4a5568;
+          font-style: italic;
           margin: 1.5em 0;
+        }
+        
+        .markdown-content pre {
+          background: #f7fafc;
+          border-radius: 0.375rem;
+          padding: 1em;
+          overflow-x: auto;
+          margin: 1.5em 0;
+        }
+        
+        .markdown-content code {
+          background: #edf2f7;
+          padding: 0.2em 0.4em;
+          border-radius: 0.25rem;
+          font-size: 0.9em;
+        }
+        
+        .markdown-content pre code {
+          background: transparent;
+          padding: 0;
+        }
+        
+        .markdown-content .math-display {
+          margin: 2em 0;
           overflow-x: auto;
           overflow-y: hidden;
-          padding: 0.5em 0;
+          padding: 1em 0;
+          text-align: center;
         }
         
         .markdown-content .mjx-chtml {
@@ -540,7 +646,7 @@ export default function NoteDetailPage() {
           text-transform: none;
           font-style: normal;
           font-weight: normal;
-          font-size: 100%;
+          font-size: 120%;
           font-size-adjust: none;
           letter-spacing: normal;
           word-wrap: normal;
@@ -549,12 +655,22 @@ export default function NoteDetailPage() {
         }
         
         .markdown-content .MathJax {
-          font-size: 1.1em;
+          font-size: 1.2em;
+        }
+        
+        .chem-structure, .circuit-diagram {
+          margin: 2em 0;
+          border-radius: 0.5rem;
+          background-color: #f8fafc;
         }
         
         @media (max-width: 640px) {
+          .markdown-content {
+            font-size: 1rem;
+          }
+          
           .markdown-content .MathJax {
-            font-size: 0.85em;
+            font-size: 1em;
           }
         }
       `}</style>
