@@ -41,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-
 // Define KaTeX types
 declare global {
   interface Window {
@@ -260,41 +259,65 @@ export default function NoteDetailPage() {
   };
 
   const handleExportToPdf = async () => {
-    if (!note || !user?.id) return;
+    if (!note || !contentRef.current) return;
     setIsPdfExporting(true);
 
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-      if (!apiBaseUrl) {
-        throw new Error("API base URL is not configured.");
-      }
-
-      const response = await fetch(`${apiBaseUrl}/api/notes/${noteId}/export-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': user.id,
+      // Client-side PDF generation using html2pdf.js
+      // This approach preserves the LaTeX rendering from the frontend
+      // @ts-ignore - Ignore TypeScript errors for html2pdf.js import
+      const html2pdfModule = await import('html2pdf.js');
+      // @ts-ignore - Use type assertion for html2pdf function
+      const html2pdf = html2pdfModule.default || html2pdfModule;
+      
+      // Clone the content element to avoid modifying the original
+      const element = contentRef.current.cloneNode(true) as HTMLElement;
+      
+      // Create a wrapper div for better formatting
+      const wrapper = document.createElement('div');
+      wrapper.style.padding = '40px';
+      wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      
+      // Add title
+      const titleEl = document.createElement('h1');
+      titleEl.textContent = note.title;
+      titleEl.style.fontSize = '24pt';
+      titleEl.style.marginBottom = '20px';
+      wrapper.appendChild(titleEl);
+      
+      // Add metadata
+      const metaEl = document.createElement('div');
+      metaEl.style.fontSize = '10pt';
+      metaEl.style.color = '#666';
+      metaEl.style.marginBottom = '30px';
+      metaEl.innerHTML = `Created: ${new Date(note.created_at).toLocaleDateString()} | 
+                          Last updated: ${new Date(note.updated_at || note.created_at).toLocaleDateString()}`;
+      wrapper.appendChild(metaEl);
+      
+      // Add the content
+      wrapper.appendChild(element);
+      
+      // Set options for PDF generation
+      const options = {
+        margin: 15,
+        filename: `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'note'}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2,
+          useCORS: true,
+          letterRendering: true
         },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
-
-      // Get the PDF blob from the response
-      const blob = await response.blob();
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: 'portrait' 
+        }
+      };
       
-      // Create a download link and trigger it
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'note'}.pdf`;
-      document.body.appendChild(a);
-      a.click();
+      // Generate and download PDF
+      // @ts-ignore - Ignore TypeScript errors for html2pdf function call
+      await html2pdf().from(wrapper).set(options).save();
       
-      // Cleanup
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
     } catch (err) {
       console.error("Error exporting to PDF:", err);
       alert('Failed to export to PDF. Please try again.');

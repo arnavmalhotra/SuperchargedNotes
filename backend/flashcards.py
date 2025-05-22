@@ -218,33 +218,40 @@ async def create_flashcards(request: CreateFlashcardRequest, user_id: str = Depe
         focus_topic = preferences.get('focus_topic', '')  # Default to no specific focus
         
         # Create prompt for Gemini with preferences
-        prompt = f"""Based on the following text, generate a list of {card_count} flashcards at {difficulty} difficulty level. Each flashcard should be a JSON object with a "front" (question, term, or concept) and a "back" (answer or definition).
+prompt = f"""Based on the following text, generate a list of {card_count} flashcards \
+at {difficulty} difficulty level. Each flashcard should be a JSON object with a \
+"front" (question, term, or concept) and a "back" (answer or definition).
 
-IMPORTANT: Return ONLY the valid JSON array as plain text without any markdown formatting, code blocks, or annotations. Do not use markdown syntax like ```json or ```. The response should be parseable directly by JSON.parse().
+IMPORTANT: Return ONLY the valid JSON array as plain text without any markdown \
+formatting, code blocks, or annotations. Do not use markdown syntax like ```json \
+or ```. The response must be valid for JSON.parse().
 
 {f'Focus on the topic of "{focus_topic}" if present in the content.' if focus_topic else ''}
 
 Difficulty guidelines:
-- Easy: Simple definitions, basic concepts, and straightforward questions
+- Easy:   Simple definitions, basic concepts, and straightforward questions
 - Medium: More detailed explanations, intermediate concepts, and application-level questions
-- Hard: Complex details, advanced concepts, and questions requiring synthesis of multiple ideas
+- Hard:   Complex details, advanced concepts, and questions requiring synthesis of multiple ideas
 
-Special formatting guidelines:
-1. Mathematical expressions: Use LaTeX notation
-   - Inline math: $E = mc^2$
-   - Display math: $$K_a = \\frac{{[H^+][A^-]}}{{[HA]}}$$
+Special formatting guidelines
+1. Mathematical expressions: use LaTeX
+   – Inline:  $E = mc^2$
+   – Display: $$K_a = \\frac{{[H^+][A^-]}}{{[HA]}}$$
 
-2. Chemical equations and formulas: Use \\ce{} notation (will be rendered with mhchem)
-   - Example: \\ce{2H2 + O2 -> 2H2O}
-   - Example: \\ce{H2SO4}
+2. Chemical equations / formulae: use \\ce{{}}
+   – Example: \\ce{{2H2 + O2 -> 2H2O}}
+   – Example: \\ce{{H2SO4}}
 
 Text:
 ---
 {note_data['content']}
 ---
 
-Output format example:
-[{"front": "Question 1", "back": "Answer 1"}, {"front": "Question 2", "back": "Answer 2"}]"""
+Output format example
+[{{"front": "Question 1", "back": "Answer 1"}}, {{"front": "Question 2", "back": "Answer 2"}}]
+"""
+# ---------------------------------------------------------------------------
+
 
         # Call Gemini API
         response = genai_client.models.generate_content(
