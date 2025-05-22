@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Edit2, Save, Download, FilePlus, Layers, BrainCircuit } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import Script from 'next/script';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
-import rehypeSanitize from 'rehype-sanitize';
+import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
+import 'katex/dist/katex.min.css';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import { Extension } from '@codemirror/state';
 
@@ -19,21 +20,6 @@ const CodeMirror = dynamic<ReactCodeMirrorProps>(() => import('@uiw/react-codemi
   ssr: false,
   loading: () => <div className="h-[600px] bg-gray-100 animate-pulse rounded-md"></div>
 });
-
-// Define MathJax types
-declare global {
-  interface Window {
-    MathJax?: {
-      typesetPromise?: () => Promise<any>;
-      typeset?: (elements?: any[]) => void;
-      tex?: any;
-      svg?: any;
-      loader?: any;
-      startup?: any;
-      hub?: any;
-    }
-  }
-}
 
 // Custom renderer components
 const ChemBlock = ({ children }: { children: string }) => (
@@ -78,45 +64,6 @@ export default function NoteDetailPage() {
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [quizCreationError, setQuizCreationError] = useState<string | null>(null);
   
-  // Function to initialize MathJax
-  const initMathJax = () => {
-    if (typeof window !== 'undefined' && window.MathJax) {
-      window.MathJax.typesetPromise?.();
-    }
-  };
-
-  // Update content after MathJax loads or content changes
-  useEffect(() => {
-    if (!isEditing && note?.content) {
-      // Process content specifically for chemical formulas
-      processChemicalFormulas();
-      
-      // Schedule MathJax typesetting after component updates
-      setTimeout(() => {
-        initMathJax();
-      }, 100);
-    }
-  }, [isEditing, note?.content]);
-
-  // Process chemical formulas specifically
-  const processChemicalFormulas = () => {
-    if (contentRef.current) {
-      // Let MathJax process the entire content
-      setTimeout(() => {
-        if (typeof window !== 'undefined' && window.MathJax) {
-          try {
-            // Force MathJax to process all math in the content
-            window.MathJax.typeset?.(undefined);
-            window.MathJax.typesetPromise?.();
-          } catch (e) {
-            console.error("Error processing MathJax:", e);
-          }
-        }
-      }, 200);
-    }
-  };
-
-  // Custom components for ReactMarkdown
   const components = {
     code({ node, inline, className, children, ...props }: any) {
       const match = /language-(\w+)/.exec(className || '');
@@ -413,41 +360,6 @@ export default function NoteDetailPage() {
 
   return (
     <div className="container mx-auto p-6">
-      {/* Add MathJax script */}
-      <Script 
-        id="mathjax-script"
-        strategy="afterInteractive"
-        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"
-        onLoad={() => {
-          // Configure MathJax
-          window.MathJax = {
-            tex: {
-              inlineMath: [['$', '$'], ['\\(', '\\)']],
-              displayMath: [['$$', '$$'], ['\\[', '\\]']],
-              processEscapes: true,
-              packages: {'[+]': ['mhchem']}
-            },
-            svg: {
-              fontCache: 'global'
-            },
-            loader: {
-              load: ['[tex]/mhchem']
-            },
-            startup: {
-              pageReady: () => {
-                const promise = window.MathJax?.startup?.defaultPageReady?.() || Promise.resolve();
-                return promise.then(() => {
-                  if (window.MathJax?.typeset) {
-                    // Process everything
-                    window.MathJax.typeset();
-                  }
-                });
-              }
-            }
-          };
-        }}
-      />
-
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center">
           <Button variant="ghost" size="sm" onClick={handleBackToNotes} className="mr-4">
@@ -574,7 +486,7 @@ export default function NoteDetailPage() {
           >
             <ReactMarkdown
               remarkPlugins={[remarkMath]}
-              rehypePlugins={[rehypeSanitize]}
+              rehypePlugins={[rehypeKatex, rehypeRaw]}
               components={components}
             >
               {note.content}
@@ -640,57 +552,18 @@ export default function NoteDetailPage() {
           padding: 0;
         }
         
-        .markdown-content .math-display {
-          margin: 2em 0;
+        /* KaTeX specific styles */
+        .katex-display {
+          margin: 1.5em 0 !important;
           overflow-x: auto;
           overflow-y: hidden;
-          padding: 1em 0;
-          text-align: center;
         }
         
-        .markdown-content .mjx-chtml {
-          display: inline-block;
-          line-height: 0;
-          text-indent: 0;
-          text-align: left;
-          text-transform: none;
-          font-style: normal;
-          font-weight: normal;
-          font-size: 120%;
-          font-size-adjust: none;
-          letter-spacing: normal;
-          word-wrap: normal;
-          direction: ltr;
-          background: transparent;
+        .katex {
+          font-size: 1.1em !important;
         }
         
-        .markdown-content .MathJax {
-          font-size: 1.2em;
-          margin: 0 0.15em;
-        }
-        
-        /* Fix display math spacing */
-        .markdown-content .MathJax_Display {
-          margin: 1em 0;
-        }
-        
-        /* Ensure chemical formulas are visible */
-        .markdown-content .mjx-chem {
-          display: inline-block;
-        }
-        
-        /* Improve CE and ChemFig visibility */
-        mjx-container[jax="SVG"] {
-          display: inline-block;
-          margin: auto;
-        }
-        
-        .markdown-content p mjx-container[jax="SVG"][display="true"] {
-          display: block;
-          text-align: center;
-          margin: 1em 0;
-        }
-        
+        /* Ensure chemical formulas and math are properly styled */
         .chem-structure, .circuit-diagram {
           margin: 2em 0;
           border-radius: 0.5rem;
@@ -702,8 +575,8 @@ export default function NoteDetailPage() {
             font-size: 1rem;
           }
           
-          .markdown-content .MathJax {
-            font-size: 1em;
+          .katex {
+            font-size: 1em !important;
           }
         }
       `}</style>

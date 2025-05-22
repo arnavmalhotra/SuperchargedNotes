@@ -102,7 +102,8 @@ export default function NotesPage() {
       fetchNotes(); 
       // Optionally, you might want to show a success toast/notification here
       alert(data.message || 'Note deleted successfully');
-      router.push('/');
+      // Don't navigate away - we're already on the notes page
+      // router.push('/');
 
     } catch (err) {
       console.error(`Error deleting note ${noteId}:`, err);

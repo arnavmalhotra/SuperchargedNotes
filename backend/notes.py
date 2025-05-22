@@ -308,52 +308,48 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         
         note = response.data[0]
         
-        # Replace \chemfig{...} with \ce{...} for easier processing
-        content = note['content']
-        content = re.sub(r'\\chemfig\{([^}]+)\}', r'\\ce{\1}', content)
-        note['content'] = content
-        
         # Process the markdown content including math
-        # Add the MathExtension for basic LaTeX rendering
         extensions = ["fenced_code", "tables", MathExtension(enable_dollar_delimiter=True)]
         html_content = markdown2.markdown(note['content'], extras=extensions)
         
-        # Process LaTeX equations and chemical formulas
-        # This requires additional processing for complex equations
-        def process_latex(match):
-            latex = match.group(1)
-            try:
-                # Try to convert LaTeX to MathML for inline display
-                mathml = latex2mathml.converter.convert(latex)
-                return mathml
-            except:
-                # Fallback to just showing the LaTeX
-                return f"<span class='latex-error'>{latex}</span>"
+        # Process chemical formulas with proper handling
+        # Convert \ce{} commands for chemistry
+        def process_chem_formula(match):
+            formula = match.group(1)
+            # Process subscripts in chemical formulas
+            processed = re.sub(r'_(\d+)', r'<sub>\1</sub>', formula)
+            return f'<span class="chemical-formula">{processed}</span>'
         
-        # Process inline math: $...$ or \(...\)
-        html_content = re.sub(r'\$([^$]+)\$', lambda m: process_latex(m), html_content)
-        html_content = re.sub(r'\\\(([^)]+)\\\)', lambda m: process_latex(m), html_content)
+        html_content = re.sub(r'\\ce\{([^}]+)\}', process_chem_formula, html_content)
         
-        # Process display math: $$...$$ or \[...\]
-        html_content = re.sub(r'\$\$([^$]+)\$\$', lambda m: f"<div class='math-display'>{process_latex(m)}</div>", html_content)
-        html_content = re.sub(r'\\\[([^\]]+)\\\]', lambda m: f"<div class='math-display'>{process_latex(m)}</div>", html_content)
+        # Convert \chemfig{} commands 
+        html_content = re.sub(r'\\chemfig\{([^}]+)\}', r'<span class="chem-structure">\ce{\1}</span>', html_content)
         
-        # For chemical equations using \ce{...}
-        def process_chem(match):
-            chem_formula = match.group(1)
-            # Handle basic chemical formulas with subscripts
-            processed = re.sub(r'(\d+)', r'<sub>\1</sub>', chem_formula)
-            return f"<span class='chem-formula'>{processed}</span>"
-        
-        html_content = re.sub(r'\\ce\{([^}]+)\}', lambda m: process_chem(m), html_content)
-        
-        # Create full HTML document
+        # Create full HTML document with KaTeX for PDF rendering
         full_html = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
             <title>{note['title']}</title>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+                onload="renderMathInElement(document.body, {{
+                    delimiters: [
+                        {{left: '$$', right: '$$', display: true}},
+                        {{left: '$', right: '$', display: false}},
+                        {{left: '\\\\(', right: '\\\\)', display: false}},
+                        {{left: '\\\\[', right: '\\\\]', display: true}}
+                    ],
+                    trust: true,
+                    strict: false,
+                    throwOnError: false,
+                    macros: {{
+                        '\\\\ce': '\\\\text{{\\\\ce{#1}}}'
+                    }}
+                }});">
+            </script>
             <style>
                 @page {{ 
                     size: A4; 
@@ -385,12 +381,21 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
                 code {{
                     font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
                 }}
-                .chem-formula sub {{
+                .chemical-formula sub {{
                     font-size: 0.8em;
                 }}
-                .math-display {{
+                .katex-display {{
                     margin: 1em 0;
-                    text-align: center;
+                    overflow-x: auto;
+                }}
+                .katex {{
+                    font-size: 1.1em;
+                }}
+                .chem-structure {{
+                    padding: 10px;
+                    margin: 10px 0;
+                    background-color: #f8f9fa;
+                    border-radius: 4px;
                 }}
             </style>
         </head>
@@ -409,23 +414,26 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         
         # Create a temporary file to save the PDF
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
-            # Generate PDF using WeasyPrint
-            HTML(string=full_html).write_pdf(
-                tmp.name, 
-                stylesheets=[CSS(string="""
-                    @page { 
-                        size: A4; 
-                        margin: 2cm;
-                    }
-                """)]
-            )
-            
-            # Read the PDF file
-            with open(tmp.name, 'rb') as pdf_file:
-                pdf_bytes = pdf_file.read()
-            
-            # Clean up
-            os.unlink(tmp.name)
+            try:
+                # Generate PDF using WeasyPrint with KaTeX CSS
+                HTML(string=full_html).write_pdf(
+                    tmp.name, 
+                    stylesheets=[
+                        CSS(string="""
+                            @page { 
+                                size: A4; 
+                                margin: 2cm;
+                            }
+                        """)
+                    ]
+                )
+                
+                # Read the PDF file
+                with open(tmp.name, 'rb') as pdf_file:
+                    pdf_bytes = pdf_file.read()
+            finally:
+                # Clean up
+                os.unlink(tmp.name)
         
         # Return the PDF
         return Response(
