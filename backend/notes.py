@@ -309,10 +309,16 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         
         note = response.data[0]
         
+        # Pre-process content to handle chemical equations
+        content = note['content']
+        # Convert chemical equations to LaTeX format that MathML can handle
+        content = re.sub(r'\\ce\{([^}]+)\}', r'$\\ce{\1}$', content)
+        content = re.sub(r'\\chemfig\{([^}]+)\}', r'$\\chemfig{\1}$', content)
+        
         # Process the markdown content with better handling for math and chemistry
         # 1. First convert the markdown to HTML with MathExtension for basic LaTeX
         extensions = ["fenced_code", "tables", MathExtension(enable_dollar_delimiter=True)]
-        html_content = markdown2.markdown(note['content'], extras=extensions)
+        html_content = markdown2.markdown(content, extras=extensions)
         
         # 2. Create a BeautifulSoup object to manipulate the HTML
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -322,6 +328,26 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
             try:
                 latex_content = math_tag.string.strip()
                 is_display = 'display' in math_tag.get('class', [])
+                
+                # Handle chemistry notation in LaTeX
+                if '\\ce{' in latex_content or '\\chemfig{' in latex_content:
+                    # For chemistry, we'll use a different approach - create an image
+                    try:
+                        # Use requests to get rendered image from KaTeX API
+                        encoded_latex = base64.b64encode(latex_content.encode('utf-8')).decode('utf-8')
+                        img_tag = soup.new_tag('img')
+                        img_tag['alt'] = latex_content
+                        img_tag['src'] = f"data:image/svg+xml;base64,{encoded_latex}"
+                        img_tag['class'] = 'chemistry-formula'
+                        if is_display:
+                            img_tag['style'] = 'display: block; margin: 1em auto;'
+                        else:
+                            img_tag['style'] = 'display: inline-block; vertical-align: middle;'
+                        math_tag.replace_with(img_tag)
+                        continue
+                    except Exception as e:
+                        print(f"Error creating chemistry image: {e}")
+                        # Fall back to regular MathML conversion
                 
                 # Convert LaTeX to MathML using latex2mathml
                 mathml = latex2mathml.converter.convert(latex_content)
@@ -397,6 +423,24 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
                 math {{
                     font-size: 1.1em;
                 }}
+                /* Chemistry-specific styles */
+                .chemistry-formula {{
+                    max-width: 100%;
+                }}
+                .chem-structure {{
+                    margin: 1em 0;
+                    padding: 1em;
+                    background-color: #f8f9fa;
+                    border-radius: 4px;
+                }}
+                /* Better rendering for chemical formulas */
+                .cemord {{
+                    margin-right: 0.05em;
+                }}
+                /* Ensure proper alignment for subscripts */
+                .msupsub {{
+                    text-align: left;
+                }}
             </style>
         </head>
         <body>
@@ -426,6 +470,16 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
                             }
                             math {
                                 font-size: 1.1em;
+                            }
+                            /* Chemistry-specific styles */
+                            .chemistry-formula {
+                                max-width: 100%;
+                            }
+                            .chem-structure {
+                                margin: 1em 0;
+                                padding: 1em;
+                                background-color: #f8f9fa;
+                                border-radius: 4px;
                             }
                         """)
                     ]

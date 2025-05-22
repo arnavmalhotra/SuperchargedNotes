@@ -38,6 +38,14 @@ const ChemBlock = ({ children }: { children: string }) => {
   const processedContent = children
     .replace(/\\ce\{([^}]+)\}/g, (_, formula) => `$\\ce{${formula}}$`)
     .replace(/\\chemfig\{([^}]+)\}/g, (_, formula) => `$\\chemfig{${formula}}$`);
+  
+  // Ensure KaTeX with mhchem is loaded
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.katex) {
+      // Ensure mhchem extension is loaded
+      require('katex/dist/contrib/mhchem');
+    }
+  }, []);
     
   return (
     <div className="chem-structure p-4 border border-gray-200 rounded-md bg-gray-50 my-4">
@@ -390,6 +398,12 @@ export default function NoteDetailPage() {
       return text;
     }
     
+    // First ensure KaTeX mhchem extension is available
+    if (typeof window !== 'undefined' && window.katex) {
+      // Ensure mhchem extension is loaded
+      require('katex/dist/contrib/mhchem');
+    }
+    
     // Wrap chemical equations in KaTeX delimiters
     return text
       .replace(/\\ce\{([^}]+)\}/g, (_, formula) => `$\\ce{${formula}}$`)
@@ -631,6 +645,7 @@ export default function NoteDetailPage() {
           margin: 1.5em 0 !important;
           overflow-x: auto;
           overflow-y: hidden;
+          padding: 0.5em 0;
         }
         
         .katex {
@@ -670,6 +685,21 @@ export default function NoteDetailPage() {
         /* Fix styling for chemistry equations */
         .markdown-content .mhchem .mord {
           display: inline-block;
+        }
+        
+        /* Better styling for chemical equations */
+        .markdown-content .mhchem .mord.cemord {
+          margin-right: 0.05em;
+        }
+        
+        /* Ensure proper alignment for subscripts in chemical formulas */
+        .markdown-content .mhchem .msupsub {
+          text-align: left;
+        }
+        
+        /* Ensure chemical arrows render properly */
+        .markdown-content .mhchem .mrel {
+          margin: 0 0.2em;
         }
         
         @media (max-width: 640px) {
