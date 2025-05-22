@@ -273,22 +273,51 @@ export default function NoteDetailPage() {
       // Clone the content element to avoid modifying the original
       const element = contentRef.current.cloneNode(true) as HTMLElement;
       
+      // Helper function to remove unsupported color formats from an element and its children
+      const processElement = (el: HTMLElement) => {
+        // Process the current element
+        if (el.style) {
+          // Replace any oklch colors with a fallback color
+          const styleProps = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
+          for (const prop of styleProps) {
+            const value = el.style[prop as any];
+            if (value && (value.includes('oklch') || value.includes('rgb('))) {
+              // Replace with a safe fallback color
+              el.style[prop as any] = prop === 'backgroundColor' ? '#f8f9fa' : '#333333';
+            }
+          }
+        }
+        
+        // Process all child elements recursively
+        Array.from(el.children).forEach(child => {
+          if (child instanceof HTMLElement) {
+            processElement(child);
+          }
+        });
+      };
+      
+      // Process the element to remove unsupported color formats
+      processElement(element);
+      
       // Create a wrapper div for better formatting
       const wrapper = document.createElement('div');
       wrapper.style.padding = '40px';
       wrapper.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      wrapper.style.color = '#333333'; // Set safe colors explicitly
+      wrapper.style.backgroundColor = '#ffffff';
       
       // Add title
       const titleEl = document.createElement('h1');
       titleEl.textContent = note.title;
       titleEl.style.fontSize = '24pt';
       titleEl.style.marginBottom = '20px';
+      titleEl.style.color = '#333333'; // Set safe colors explicitly
       wrapper.appendChild(titleEl);
       
       // Add metadata
       const metaEl = document.createElement('div');
       metaEl.style.fontSize = '10pt';
-      metaEl.style.color = '#666';
+      metaEl.style.color = '#666666'; // Use hex color format for compatibility
       metaEl.style.marginBottom = '30px';
       metaEl.innerHTML = `Created: ${new Date(note.created_at).toLocaleDateString()} | 
                           Last updated: ${new Date(note.updated_at || note.created_at).toLocaleDateString()}`;
@@ -305,7 +334,12 @@ export default function NoteDetailPage() {
         html2canvas: { 
           scale: 2,
           useCORS: true,
-          letterRendering: true
+          letterRendering: true,
+          logging: false, // Disable logging
+          ignoreElements: (element: Element) => {
+            // Ignore elements with problematic styles that might cause issues
+            return element.classList?.contains('ignore-pdf');
+          }
         },
         jsPDF: { 
           unit: 'mm', 
@@ -320,7 +354,7 @@ export default function NoteDetailPage() {
       
     } catch (err) {
       console.error("Error exporting to PDF:", err);
-      alert('Failed to export to PDF. Please try again.');
+      alert('Failed to export to PDF. Please try again. Error: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsPdfExporting(false);
     }
