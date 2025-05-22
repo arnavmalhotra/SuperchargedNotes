@@ -11,11 +11,14 @@ import latex2mathml.converter
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT, TA_CENTER
 import io
 import re
+import base64
+from playwright.async_api import async_playwright
+import asyncio
 
 # Create router for notes endpoints
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -284,133 +287,144 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
 
     try:
         # Fetch the note
-        response = supabase.from_('notes').select('*').eq('id', note_id).eq('user_id', x_user_id).execute()
+        response = supabase.from_('notes')\
+            .select('*')\
+            .eq('id', note_id)\
+            .eq('user_id', x_user_id)\
+            .execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(status_code=404, detail="Note not found")
         
         note = response.data[0]
-        
-        # Custom LaTeX handler for markdown2
-        def latex_to_mathml(latex_str):
-            try:
-                return latex2mathml.converter.convert(latex_str)
-            except Exception as e:
-                print(f"Error converting LaTeX to MathML: {e}")
-                return latex_str  # Return original string if conversion fails
-        
-        # Convert markdown to HTML with LaTeX support
-        extras = {
-            'fenced-code-blocks': None,
-            'tables': None,
-            'break-on-newline': None,
-            'code-friendly': None,
-            'strike': None,
-            'task_list': None,
-            'latex': {
-                'convert': latex_to_mathml,
-            },
-            'math': {
-                'convert': latex_to_mathml,
-            }
-        }
-        
-        html_content = markdown2.markdown(note['content'], extras=extras)
-        
-        # Create PDF buffer
-        buffer = io.BytesIO()
-        
-        # Create the PDF document
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            rightMargin=2*cm,
-            leftMargin=2*cm,
-            topMargin=2*cm,
-            bottomMargin=2*cm
-        )
-        
-        # Get the default style sheet and create custom styles
-        styles = getSampleStyleSheet()
-        
-        # Custom styles
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Title'],
-            fontSize=24,
-            spaceAfter=30,
-            textColor=colors.black
-        )
-        
-        metadata_style = ParagraphStyle(
-            'Metadata',
-            parent=styles['Normal'],
-            fontSize=9,
-            textColor=colors.gray,
-            spaceAfter=20
-        )
-        
-        code_style = ParagraphStyle(
-            'Code',
-            parent=styles['Code'],
-            fontSize=10,
-            fontName='Courier',
-            backColor=colors.lightgrey,
-            borderPadding=5
-        )
-        
-        # Story (content elements)
-        story = []
-        
-        # Add title
-        story.append(Paragraph(note['title'], title_style))
-        
-        # Add metadata
-        metadata = f"Created: {datetime.fromisoformat(note['created_at']).strftime('%B %d, %Y')} | Last updated: {datetime.fromisoformat(note['updated_at']).strftime('%B %d, %Y')}"
-        story.append(Paragraph(metadata, metadata_style))
-        
-        # Process HTML content into ReportLab elements
-        # Split content by code blocks first
-        parts = re.split(r'(<pre><code>.*?</code></pre>)', html_content, flags=re.DOTALL)
-        
-        for part in parts:
-            if part.startswith('<pre><code>'):
-                # Handle code blocks
-                code = part[11:-13].strip()  # Remove <pre><code> and </code></pre>
-                story.append(Paragraph(code, code_style))
-                story.append(Spacer(1, 12))
-            else:
-                # Handle regular content
-                # Split by double newlines to create paragraphs
-                paragraphs = part.split('\n\n')
-                for p in paragraphs:
-                    if p.strip():
-                        # Handle task lists
-                        if p.startswith('<li class="task-list-item">'):
-                            p = p.replace('<li class="task-list-item">', '☐ ').replace('</li>', '')
-                        # Handle other HTML elements
-                        p = p.replace('<strong>', '<b>').replace('</strong>', '</b>')
-                        p = p.replace('<em>', '<i>').replace('</em>', '</i>')
-                        p = p.replace('<del>', '<strike>').replace('</del>', '</strike>')
-                        story.append(Paragraph(p, styles['Normal']))
-                        story.append(Spacer(1, 12))
-        
-        # Build the PDF
-        doc.build(story)
-        
-        # Get the value of the BytesIO buffer
-        pdf_content = buffer.getvalue()
-        buffer.close()
-        
-        # Return the PDF
-        return Response(
-            content=pdf_content,
-            media_type='application/pdf',
-            headers={
-                'Content-Disposition': f'attachment; filename="{note["title"].replace(" ", "_")}.pdf"'
-            }
-        )
+
+        # Generate PDF using Playwright for better rendering of MathJax and chemistry formulas
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page(viewport={"width": 1024, "height": 1400})
+            
+            # Prepare HTML content with MathJax
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>{note['title']}</title>
+                <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+                <script>
+                MathJax = {{
+                    tex: {{
+                        inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+                        displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+                        processEscapes: true,
+                        packages: {{'[+]': ['mhchem', 'chemfig']}}
+                    }},
+                    loader: {{
+                        load: ['[tex]/mhchem', '[tex]/chemfig']
+                    }},
+                    startup: {{
+                        pageReady: function() {{
+                            return MathJax.startup.defaultPageReady();
+                        }}
+                    }}
+                }};
+                </script>
+                <style>
+                    body {{
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+                        line-height: 1.6;
+                        padding: 2cm;
+                        max-width: 21cm;
+                        margin: 0 auto;
+                    }}
+                    h1 {{
+                        font-size: 24px;
+                        margin-bottom: 0.5em;
+                    }}
+                    .metadata {{
+                        font-size: 12px;
+                        color: #666;
+                        margin-bottom: 2em;
+                    }}
+                    pre {{
+                        background-color: #f5f5f5;
+                        padding: 1em;
+                        border-radius: 4px;
+                        overflow-x: auto;
+                    }}
+                    code {{
+                        font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+                    }}
+                    .chem-structure, .circuit-diagram {{
+                        padding: 1em;
+                        border: 1px solid #eee;
+                        border-radius: 4px;
+                        background-color: #f9f9f9;
+                        margin: 1em 0;
+                    }}
+                    .mjx-chtml {{
+                        display: inline-block;
+                        line-height: 0;
+                        text-indent: 0;
+                        text-align: left;
+                        text-transform: none;
+                        font-style: normal;
+                        font-weight: normal;
+                        font-size: 100%;
+                        font-size-adjust: none;
+                        letter-spacing: normal;
+                        word-wrap: normal;
+                        direction: ltr;
+                        background: transparent;
+                    }}
+                    @media print {{
+                        body {{
+                            padding: 0;
+                        }}
+                    }}
+                </style>
+            </head>
+            <body>
+                <h1>{note['title']}</h1>
+                <div class="metadata">
+                    Created: {datetime.fromisoformat(note['created_at']).strftime('%B %d, %Y')} | 
+                    Last updated: {datetime.fromisoformat(note['updated_at']).strftime('%B %d, %Y')}
+                </div>
+                <div class="content">
+                    {note['content']}
+                </div>
+            </body>
+            </html>
+            """
+            
+            # Load the HTML content
+            await page.set_content(html_content)
+            
+            # Wait for MathJax to finish rendering
+            await page.wait_for_function("""
+                () => {
+                    return window.MathJax && 
+                           window.MathJax.startup && 
+                           window.MathJax.startup.promise && 
+                           window.MathJax.startup.promise.state() === 1;
+                }
+            """, timeout=10000)
+            
+            # Generate PDF
+            pdf_bytes = await page.pdf(format="A4", margin={"top": "1cm", "right": "1cm", "bottom": "1cm", "left": "1cm"})
+            
+            await browser.close()
+            
+            # Return the PDF
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{note["title"].replace(" ", "_")}.pdf"'
+                }
+            )
         
     except Exception as e:
         print(f"Error generating PDF: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate PDF") 
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF: {str(e)}") 

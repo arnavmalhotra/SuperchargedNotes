@@ -6,14 +6,29 @@ import { useParams, useRouter } from 'next/navigation';
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Edit2, Save, Download, FilePlus, Layers, BrainCircuit } from 'lucide-react';
-import CodeMirror from '@uiw/react-codemirror';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
-import 'katex/dist/katex.min.css';
+import dynamic from 'next/dynamic';
+import Script from 'next/script';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import rehypeSanitize from 'rehype-sanitize';
+
+// Dynamically import components to avoid SSR issues
+const CodeMirror = dynamic(() => import('@uiw/react-codemirror'), { 
+  ssr: false,
+  loading: () => <div className="h-[600px] bg-gray-100 animate-pulse rounded-md"></div>
+});
+
+// Define MathJax types
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise?: () => Promise<any>;
+      tex?: any;
+      loader?: any;
+      startup?: any;
+    }
+  }
+}
 
 // Custom renderer components
 const ChemBlock = ({ children }: { children: string }) => (
@@ -62,6 +77,23 @@ export default function NoteDetailPage() {
   const [isCreatingQuiz, setIsCreatingQuiz] = useState(false);
   const [quizCreationError, setQuizCreationError] = useState<string | null>(null);
   
+  // Function to initialize MathJax
+  const initMathJax = () => {
+    if (typeof window !== 'undefined' && window.MathJax) {
+      window.MathJax.typesetPromise?.();
+    }
+  };
+
+  // Update content after MathJax loads or content changes
+  useEffect(() => {
+    if (!isEditing && note?.content) {
+      // Schedule MathJax typesetting after component updates
+      setTimeout(() => {
+        initMathJax();
+      }, 100);
+    }
+  }, [isEditing, note?.content]);
+
   // Custom components for ReactMarkdown
   const components = {
     code({ node, inline, className, children, ...props }: any) {
@@ -328,6 +360,32 @@ export default function NoteDetailPage() {
 
   return (
     <div className="container mx-auto p-6">
+      {/* Add MathJax script */}
+      <Script 
+        id="mathjax-script"
+        strategy="afterInteractive"
+        src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+        onLoad={() => {
+          // Configure MathJax
+          window.MathJax = {
+            tex: {
+              inlineMath: [['$', '$'], ['\\(', '\\)']],
+              displayMath: [['$$', '$$'], ['\\[', '\\]']],
+              processEscapes: true,
+              packages: {'[+]': ['mhchem', 'chemfig']}
+            },
+            loader: {
+              load: ['[tex]/mhchem', '[tex]/chemfig']
+            },
+            startup: {
+              pageReady: () => {
+                initMathJax();
+              }
+            }
+          };
+        }}
+      />
+
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center">
           <Button variant="ghost" size="sm" onClick={handleBackToNotes} className="mr-4">
@@ -422,6 +480,7 @@ export default function NoteDetailPage() {
         
         {isEditing ? (
           <div className="border border-gray-300 rounded-lg">
+            {/* @ts-ignore - CodeMirror props are handled by dynamic import */}
             <CodeMirror
               value={editedContent}
               onChange={setEditedContent}
@@ -431,11 +490,14 @@ export default function NoteDetailPage() {
             />
             <div className="p-3 bg-gray-50 border-t">
               <p className="text-xs text-gray-500">
-                <strong>Markdown and LaTeX Tips:</strong> 
+                <strong>Markdown and Math Tips:</strong> 
                 Use standard Markdown for formatting. For equations, use $...$ for inline math and $$...$$ for display equations.
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                For chemistry formulas, use <code>$\ce&#123;H2O&#125;$</code> for inline or <code>$$\ce&#123;H2O&#125;$$</code> for display formulas.
+                For chemistry formulas, use <code>$\ce{H_2O}$</code> for inline or <code>$$\ce{H_2O}$$</code> for display formulas.
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                For chemical structures, you can use ChemFig with <code>$\chemfig{...}$</code> syntax.
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 For circuit diagrams, use <code>```circuit</code> with your diagram content and end with <code>```</code>. 
@@ -450,15 +512,7 @@ export default function NoteDetailPage() {
           >
             <ReactMarkdown
               remarkPlugins={[remarkMath]}
-              rehypePlugins={[
-                [rehypeKatex, { 
-                  output: 'html',
-                  throwOnError: false, 
-                  strict: false,
-                  trust: true
-                }], 
-                rehypeSanitize
-              ]}
+              rehypePlugins={[rehypeSanitize]}
               components={components}
             >
               {note.content}
@@ -467,28 +521,37 @@ export default function NoteDetailPage() {
         )}
       </div>
 
-      {/* Add custom styles for content */}
+      {/* Update custom styles for content */}
       <style jsx global>{`
-        .markdown-content .katex-display {
+        .markdown-content .math-display {
           margin: 1.5em 0;
           overflow-x: auto;
           overflow-y: hidden;
           padding: 0.5em 0;
         }
         
-        .markdown-content .katex {
+        .markdown-content .mjx-chtml {
+          display: inline-block;
+          line-height: 0;
+          text-indent: 0;
+          text-align: left;
+          text-transform: none;
+          font-style: normal;
+          font-weight: normal;
+          font-size: 100%;
+          font-size-adjust: none;
+          letter-spacing: normal;
+          word-wrap: normal;
+          direction: ltr;
+          background: transparent;
+        }
+        
+        .markdown-content .MathJax {
           font-size: 1.1em;
         }
         
-        .markdown-content .katex-display > .katex {
-          font-size: 1.21em;
-        }
-        
-        /* Load mhchem extension for KaTeX */
-        @import url('https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/mhchem.min.css');
-        
         @media (max-width: 640px) {
-          .markdown-content .katex-display {
+          .markdown-content .MathJax {
             font-size: 0.85em;
           }
         }
