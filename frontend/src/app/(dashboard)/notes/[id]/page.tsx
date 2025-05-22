@@ -15,6 +15,16 @@ import 'katex/dist/katex.min.css';
 import 'katex/dist/contrib/mhchem';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import { Extension } from '@codemirror/state';
+import React from 'react';
+
+// Define KaTeX types
+declare global {
+  interface Window {
+    katex?: {
+      renderToString: (formula: string, options?: any) => string;
+    }
+  }
+}
 
 // Dynamically import components to avoid SSR issues
 const CodeMirror = dynamic<ReactCodeMirrorProps>(() => import('@uiw/react-codemirror'), { 
@@ -330,6 +340,62 @@ export default function NoteDetailPage() {
     }
   };
 
+  // Effect to ensure KaTeX processes all chemistry elements after render
+  useEffect(() => {
+    if (!isEditing && contentRef.current && typeof window !== 'undefined' && window.katex) {
+      // Find all chemistry elements and process them
+      const processChemElements = () => {
+        const chemElements = contentRef.current?.querySelectorAll('.chemistry-content');
+        if (chemElements && chemElements.length > 0) {
+          chemElements.forEach(element => {
+            // Attempt to render chemical formulas
+            try {
+              // Get the raw content
+              const content = element.textContent || '';
+              
+              // Replace chemical formulas with KaTeX rendered elements
+              const processedContent = content.replace(
+                /\\ce\{([^}]+)\}/g, 
+                (match, formula) => {
+                  try {
+                    const katexRendered = window.katex.renderToString(`\\ce{${formula}}`, {
+                      throwOnError: false,
+                      output: 'html'
+                    });
+                    return katexRendered;
+                  } catch (e) {
+                    console.error('Error rendering chemical formula:', e);
+                    return match;
+                  }
+                }
+              );
+              
+              // Set the processed content
+              element.innerHTML = processedContent;
+            } catch (e) {
+              console.error('Error processing chemistry element:', e);
+            }
+          });
+        }
+      };
+      
+      // Process chemistry elements after a small delay to ensure everything is rendered
+      setTimeout(processChemElements, 300);
+    }
+  }, [isEditing, note?.content]);
+
+  // Helper function to process chemistry in text
+  const processChemistryText = (text: string) => {
+    if (!text.includes('\\ce{') && !text.includes('\\chemfig{')) {
+      return text;
+    }
+    
+    // Wrap chemical equations in KaTeX delimiters
+    return text
+      .replace(/\\ce\{([^}]+)\}/g, (_, formula) => `$\\ce{${formula}}$`)
+      .replace(/\\chemfig\{([^}]+)\}/g, (_, formula) => `$\\chemfig{${formula}}$`);
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -476,10 +542,10 @@ export default function NoteDetailPage() {
                 Use standard Markdown for formatting. For equations, use $...$ for inline math and $$...$$ for display equations.
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                For chemistry formulas, use <code>{'$\\ce{H_2O}$'}</code> for inline or <code>{'$$\\ce{H_2O}$$'}</code> for display formulas.
+                For chemistry formulas, use <code>{'\\ce{H_2O}'}</code> for inline chemical equations.
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                For chemical structures, you can use ChemFig with <code>{'$\\chemfig{...}$'}</code> syntax.
+                For chemical structures, you can use ChemFig with <code>{'\\chemfig{...}'}</code> syntax.
               </p>
               <p className="text-xs text-gray-500 mt-1">
                 For circuit diagrams, use <code>{'```circuit'}</code> with your diagram content and end with <code>{'```'}</code>. 
@@ -497,7 +563,7 @@ export default function NoteDetailPage() {
               rehypePlugins={[rehypeKatex, rehypeRaw]}
               components={components}
             >
-              {note.content}
+              {processChemistryText(note.content)}
             </ReactMarkdown>
           </div>
         )}
@@ -576,6 +642,34 @@ export default function NoteDetailPage() {
           margin: 2em 0;
           border-radius: 0.5rem;
           background-color: #f8fafc;
+        }
+        
+        /* Add styling for chemistry content */
+        .chemistry-content {
+          display: block;
+          width: 100%;
+          overflow-x: auto;
+        }
+        
+        /* Style for blockquotes with chemistry */
+        blockquote .chemistry-content {
+          margin: 0.5em 0;
+        }
+        
+        /* Style for chemistry in lists */
+        li .chemistry-content {
+          display: inline-block;
+          width: auto;
+        }
+
+        /* Fix to ensure all chemistry formulas render */
+        .markdown-content .katex-mathml {
+          display: none;
+        }
+
+        /* Fix styling for chemistry equations */
+        .markdown-content .mhchem .mord {
+          display: inline-block;
         }
         
         @media (max-width: 640px) {

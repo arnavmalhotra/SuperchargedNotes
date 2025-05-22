@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 import matplotlib.pyplot as plt
 from matplotlib import mathtext
 from PIL import Image as PILImage
+import requests  # Add this import for KaTeX API
 
 # Create router for notes endpoints
 router = APIRouter(prefix="/api/notes", tags=["notes"])
@@ -313,58 +314,47 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         extensions = ["fenced_code", "tables", MathExtension(enable_dollar_delimiter=True)]
         html_content = markdown2.markdown(note['content'], extras=extensions)
         
-        # 2. Post-process the HTML to properly handle chemistry formulas
-        # Preserve LaTeX in the HTML for KaTeX to render on the client side
-        
-        # Make sure math delimiters are properly preserved
-        # Replace any processed math back to LaTeX form for KaTeX to render
+        # 2. Create a BeautifulSoup object to manipulate the HTML
         soup = BeautifulSoup(html_content, 'html.parser')
         
-        # Process all math and chemistry elements
+        # 3. Pre-render LaTeX math expressions using latex2mathml
         for math_tag in soup.find_all(class_='math'):
-            # Preserve the LaTeX content for KaTeX
-            if 'display' in math_tag.get('class', []):
-                # Display math
-                math_content = math_tag.string
-                math_tag.string = ''
-                math_tag['class'] = 'katex-display'
-                math_tag.string = f"$$${math_content}$$$"
-            else:
-                # Inline math
-                math_content = math_tag.string
-                math_tag.string = ''
-                math_tag['class'] = 'katex'
-                math_tag.string = f"${math_content}$"
+            try:
+                latex_content = math_tag.string.strip()
+                is_display = 'display' in math_tag.get('class', [])
+                
+                # Convert LaTeX to MathML using latex2mathml
+                mathml = latex2mathml.converter.convert(latex_content)
+                
+                # Replace the original tag with the MathML
+                new_tag = soup.new_tag('div')
+                if is_display:
+                    new_tag['class'] = 'math-display'
+                    new_tag['style'] = 'text-align: center; margin: 1em 0;'
+                else:
+                    new_tag['class'] = 'math-inline'
+                    new_tag['style'] = 'display: inline-block; vertical-align: middle;'
+                
+                # Create a new tag with the MathML content
+                mathml_tag = BeautifulSoup(mathml, 'html.parser')
+                new_tag.append(mathml_tag)
+                
+                math_tag.replace_with(new_tag)
+            except Exception as e:
+                print(f"Error rendering math expression: {e}")
+                # If conversion fails, keep the original LaTeX
+                continue
         
         # Get the updated HTML
         html_content = str(soup)
         
-        # Final fixes: restore special LaTeX constructs that might have been escaped
-        html_content = html_content.replace("$$$", "$$")
-        
-        # Create full HTML document with KaTeX for PDF rendering
+        # Create full HTML document for PDF rendering
         full_html = f"""
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="UTF-8">
             <title>{note['title']}</title>
-            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js"></script>
-            <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
-                onload="renderMathInElement(document.body, {{
-                    delimiters: [
-                        {{left: '$$', right: '$$', display: true}},
-                        {{left: '$', right: '$', display: false}},
-                        {{left: '\\\\(', right: '\\\\)', display: false}},
-                        {{left: '\\\\[', right: '\\\\]', display: true}}
-                    ],
-                    trust: true,
-                    strict: false,
-                    throwOnError: false
-                }});">
-            </script>
             <style>
                 @page {{ 
                     size: A4; 
@@ -396,21 +386,16 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
                 code {{
                     font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
                 }}
-                .chemical-formula sub {{
-                    font-size: 0.8em;
-                }}
-                .katex-display {{
+                .math-display {{
+                    text-align: center;
                     margin: 1em 0;
-                    overflow-x: auto;
                 }}
-                .katex {{
+                .math-inline {{
+                    display: inline-block;
+                    vertical-align: middle;
+                }}
+                math {{
                     font-size: 1.1em;
-                }}
-                .chem-structure {{
-                    padding: 10px;
-                    margin: 10px 0;
-                    background-color: #f8f9fa;
-                    border-radius: 4px;
                 }}
             </style>
         </head>
@@ -430,7 +415,7 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
         # Create a temporary file to save the PDF
         with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
             try:
-                # Generate PDF using WeasyPrint with KaTeX CSS
+                # Generate PDF using WeasyPrint
                 HTML(string=full_html).write_pdf(
                     tmp.name, 
                     stylesheets=[
@@ -438,6 +423,9 @@ async def export_note_to_pdf(note_id: str, x_user_id: Optional[str] = Header(Non
                             @page { 
                                 size: A4; 
                                 margin: 2cm;
+                            }
+                            math {
+                                font-size: 1.1em;
                             }
                         """)
                     ]
