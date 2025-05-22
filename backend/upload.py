@@ -38,10 +38,6 @@ Follow these exact rules:
 1. **Formulae & reactions**: use `\ce{}` (mhchem).
 
    * Example: `\ce{2H2 + O2 -> 2H2O}`
-2. **2-D structures**: if the PDF shows one, embed valid `chemfig` inside
-
-   chem
-   \chemfig{CH_3-CH_2-OH}
    
 
 ### 4. Circuit Diagrams
@@ -80,7 +76,7 @@ Analyze this image and produce a detailed Markdown explanation.
 * If text is present, extract it verbatim.
 * Render **math** in LaTeX (`$...$` for inline, `$$...$$` for display).
 * Render **chemical formulas** with `\ce{}`.
-* If a structural formula is clear and simple, include `chemfig` in a `chem` block; otherwise describe it textually.
+* For structural formulas, use a combination of`\ce{}` blocks and latex code.
 * For circuit diagrams, describe them in a `circuit` block.
 * Explain any chemical principles depicted and, if relevant, guide the student toward a solution as a tutor would.
   """.strip()
@@ -88,7 +84,7 @@ Analyze this image and produce a detailed Markdown explanation.
 GROUP_PROMPT = r"""
 Combine all the following files into **one cohesive study note** in Markdown.
 
-Follow the same rules for headings, math (`$...$` / `$$...$$`), `\ce{}` chemistry, `chemfig` blocks, and `circuit` blocks as described earlier.
+Follow the same rules for headings, math (`$...$` / `$$...$$`), `\ce{}` chemistry, and `circuit` blocks as described earlier.
 """.strip()
 
 # --------------------------------------------------
