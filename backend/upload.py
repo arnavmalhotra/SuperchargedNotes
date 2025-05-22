@@ -290,7 +290,7 @@ async def store_results_in_supabase(results, group_files: bool, user_id: str):
 @router.post("/", response_model=UploadResponse)
 async def upload_files(
     files: List[UploadFile] = File(...),
-    group_files: bool = Form(False),
+    group_files: bool = Form(False, alias="groupFiles"),
     user_id: str = Depends(get_current_user_id)
 ):
     """Upload PDF / image files and generate enriched Markdown notes."""
